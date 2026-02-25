@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: ecommerce-api
+  # Database configuration
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ecommerce_db
+    username: ${DB_USER:postgres}}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  # JPA configuration
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.dialect.PostgreSQLDialect
+  # Jackson configuration
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    time-zone: UTC
+# JWT configuration
+jwt:
+  secret: ${JWT_SECRET:youShouldUseASecureSecretForYourApplication}
+  expiration: ${JWT_EXPIRATION:86400}}
+server:
+  port: 8080
+# Logging configuration
+logging:
+  level:
+    com.spring.luispa.ecommerce_api: DEBUG
+    org.springframework.security: DEBUG
