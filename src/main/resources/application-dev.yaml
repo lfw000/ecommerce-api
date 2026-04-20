@@ -1,0 +1,70 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  # DATASOURCE
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ecommerce_dev}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:dbadmin_2025}
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 300000
+      pool-name: EcommerceDevHikariPool
+      auto-commit: true
+
+  # JPA
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        generate_statistics: true
+        types:
+          jsonb: com.vladmihalcea.hibernate.type.json.JsonBinaryType
+    hibernate:
+      ddl-auto: none
+
+  flyway:
+    enabled: true
+    clean-disabled: false
+    baseline-on-migrate: true
+    baseline-version: 1
+
+logging:
+  level:
+    com.ecommerce: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.flywaydb: DEBUG
+    org.springframework.data.jpa: DEBUG
+
+cors:
+  allowed-origins:
+    - "http://localhost:4200"
+    - "http://localhost:3000"
+    - "http://localhost:8080"
+    - "http://127.0.0.1:4200"
+    - "http://127.0.0.1:3000"
+
+app:
+  jwt:
+    expiration-ms: 604800000
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+    try-it-out-enabled: true

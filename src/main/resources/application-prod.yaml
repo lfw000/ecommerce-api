@@ -1,0 +1,75 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      connection-timeout: 30000
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: ${DB_MIN_IDLE:5}
+      idle-timeout: 600000
+      pool-name: EcommerceProdHikariPool
+      leak-detection-threshold: 60000
+      register-mbeans: true
+
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        generate_statistics: false
+        jdbc:
+          batch_size: 30
+        order_inserts: true
+        order_updates: true
+    hibernate:
+      ddl-auto: none
+
+  flyway:
+    clean-disabled: true
+
+logging:
+  level:
+    com.ecommerce: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate: WARN
+    org.flywaydb: INFO
+  file:
+    name: /var/log/ecommerce/api.log
+    path: /var/log/ecommerce
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      total-size-cap: 10GB
+
+cors:
+  allowed-origins:
+    - "https://tudominio.com"
+    - "https://www.tudominio.com"
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  jwt:
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+    metrics:
+      enabled: true

@@ -1,6 +1,7 @@
 package com.spring.luispa.ecommerce_api.security;
 
-import com.spring.luispa.ecommerce_api.entities.User;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.spring.luispa.ecommerce_api.domain.user.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,13 +16,14 @@ public class UserDetailsImpl implements UserDetails {
 
     private String email;
 
+    @JsonIgnore
     private String password;
 
     private Collection<? extends GrantedAuthority> authorities;
 
     private Boolean enabled;
 
-    public UserDetailsImpl() {
+    protected UserDetailsImpl() {
         // No-args constructor
     }
 
@@ -33,7 +35,7 @@ public class UserDetailsImpl implements UserDetails {
         this.enabled = enabled;
     }
 
-    public static UserDetailsImpl create(User user) {
+    public static UserDetailsImpl build(User user) {
         Collection<GrantedAuthority> authorities = user.getRoles().stream()
                 .map(role -> new SimpleGrantedAuthority(role.getName().name()))
                 .collect(Collectors.toList());
@@ -43,7 +45,7 @@ public class UserDetailsImpl implements UserDetails {
                 user.getEmail(),
                 user.getPassword(),
                 authorities,
-                user.getEnabled()
+                user.isEnabled()
         );
     }
 
