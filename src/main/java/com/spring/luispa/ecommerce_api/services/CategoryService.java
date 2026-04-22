@@ -1,7 +1,11 @@
 package com.spring.luispa.ecommerce_api.services;
 
+import com.spring.luispa.ecommerce_api.api.dto.request.CreateCategoryRequest;
+import com.spring.luispa.ecommerce_api.api.dto.request.UpdateCategoryRequest;
+import com.spring.luispa.ecommerce_api.api.dto.response.CategoryResponse;
 import com.spring.luispa.ecommerce_api.domain.product.Category;
 import com.spring.luispa.ecommerce_api.domain.product.CategoryRepository;
+import com.spring.luispa.ecommerce_api.mappers.CategoryMapper;
 import com.spring.luispa.ecommerce_api.shared.exception.BusinessException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -14,14 +18,18 @@ import java.util.List;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final CategoryMapper categoryMapper;
 
-    public CategoryService(CategoryRepository categoryRepository) {
+    public CategoryService(CategoryRepository categoryRepository, CategoryMapper categoryMapper) {
         this.categoryRepository = categoryRepository;
+        this.categoryMapper = categoryMapper;
     }
 
-    public Category findById(Long id) {
-        return categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+    public CategoryResponse findById(Long id) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+
+        return categoryMapper.toResponse(category);
     }
 
     public Category findByName(String name) {
@@ -37,68 +45,86 @@ public class CategoryService {
         return categoryRepository.findByActiveTrue();
     }
 
-    public List<Category> findAllActiveOrdered() {
-        return categoryRepository.findAllActiveOrdered();
+    public List<CategoryResponse> findAllActiveOrdered() {
+        List<Category> categories = categoryRepository.findAllActiveOrdered();
+
+        return categoryMapper.toResponseList(categories);
     }
 
-    public List<Category> findRootCategories() {
-        return categoryRepository.findByParentCategoryIsNull();
+    public List<CategoryResponse> findRootCategories() {
+        List<Category> categories = categoryRepository.findByParentCategoryIsNull();
+
+        return  categoryMapper.toResponseList(categories);
     }
 
-    public List<Category> findSubcategories(Long parentId) {
-        return categoryRepository.findByParentCategoryId(parentId);
+    public List<CategoryResponse> findSubcategories(Long parentId) {
+        findById(parentId);
+
+        List<Category> categories = categoryRepository.findByParentCategoryId(parentId);
+
+        return categoryMapper.toResponseList(categories);
+    }
+
+    public String getCategoryPath(Long categoryId) {
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+
+        return category.getFullPath();
     }
 
     @Transactional
-    public Category createCategory(String name, String description, Long parentId, Integer displayOrder) {
-        if (categoryRepository.existsByName(name)) {
-            throw new BusinessException("Category already exists with name: " + name);
+    public CategoryResponse createCategory(CreateCategoryRequest request) {
+        if (categoryRepository.existsByName(request.getName())) {
+            throw new BusinessException("Category already exists with name: " + request.getName());
         }
 
-        Category category = new Category(name);
-        category.setDescription(description);
-        category.setDisplayOrder(displayOrder != null ? displayOrder : 0);
+        Category category = new Category(request.getName());
+        category.setDescription(request.getDescription());
+        category.setDisplayOrder(request.getDisplayOrder() != null ? request.getDisplayOrder() : 0);
 
-        if (parentId != null) {
-            Category parent = findById(parentId);
+        if (request.getParentId() != null) {
+            Category parent = categoryRepository.findById(request.getParentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent category not found"));
             category.setParentCategory(parent);
         }
 
-        return categoryRepository.save(category);
+        return categoryMapper.toResponse(category);
     }
 
     @Transactional
-    public Category updateCategory(Long id, String name, String description, Integer displayOrder, Boolean active) {
-        Category category = findById(id);
+    public CategoryResponse updateCategory(Long id, UpdateCategoryRequest request) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
 
-        if (name != null && !name.isBlank()) {
-            categoryRepository.findByName(name)
+        if (request.getName() != null && !request.getName().isBlank()) {
+            categoryRepository.findByName(request.getName())
                     .ifPresent(existing -> {
                         if (!existing.getId().equals(id)) {
-                            throw new BusinessException("Category name already used: " + name);
+                            throw new BusinessException("Category name already used: " + request.getName());
                         }
                     });
-            category.setName(name);
+            category.setName(request.getName());
         }
 
-        if (description != null) {
-            category.setDescription(description);
+        if (request.getDescription() != null) {
+            category.setDescription(request.getDescription());
         }
 
-        if (displayOrder != null) {
-            category.setDisplayOrder(displayOrder);
+        if (request.getDisplayOrder() != null) {
+            category.setDisplayOrder(request.getDisplayOrder());
         }
 
-        if (active != null) {
-            category.setActive(active);
+        if (request.getActive() != null) {
+            category.setActive(request.getActive());
         }
 
-        return category;
+        return categoryMapper.toResponse(category);
     }
 
     @Transactional
     public void deleteCategory(Long id) {
-        Category category = findById(id);
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
 
         List<Category> subcategories = categoryRepository.findByParentCategoryId(id);
         if (!subcategories.isEmpty()) {
@@ -114,12 +140,12 @@ public class CategoryService {
 
     @Transactional
     public void moveCategory(Long categoryId, Long newParentId) {
-        Category category = findById(categoryId);
+        Category category = findCategoryEntity(categoryId);
 
         if (newParentId == null) {
             category.setParentCategory(null);
         } else {
-            Category newParent = findById(newParentId);
+            Category newParent = findCategoryEntity(newParentId);
 
             if (isDescendant(newParent, categoryId)) {
                 throw new BusinessException("Cannot move category to its own descendant");
@@ -142,8 +168,8 @@ public class CategoryService {
         return isDescendant(potentialDescendant.getParentCategory(), ancestorId);
     }
 
-    public String getCategoryPath(Long categoryId) {
-        Category category = findById(categoryId);
-        return category.getFullPath();
+    private Category findCategoryEntity(Long categoryId) {
+        return categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
     }
 }

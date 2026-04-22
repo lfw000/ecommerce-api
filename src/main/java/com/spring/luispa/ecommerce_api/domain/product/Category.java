@@ -1,5 +1,6 @@
 package com.spring.luispa.ecommerce_api.domain.product;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.spring.luispa.ecommerce_api.shared.common.AuditableBaseEntity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -34,9 +35,11 @@ public class Category extends AuditableBaseEntity {
     private Category parentCategory;
 
     @OneToMany(mappedBy = "parentCategory", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Category> subCategories = new ArrayList<>();
 
     @OneToMany(mappedBy = "category", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Product> products = new ArrayList<>();
 
     @Column(name = "display_order")

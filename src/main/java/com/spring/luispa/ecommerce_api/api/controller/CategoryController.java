@@ -1,5 +1,8 @@
 package com.spring.luispa.ecommerce_api.api.controller;
 
+import com.spring.luispa.ecommerce_api.api.dto.request.CreateCategoryRequest;
+import com.spring.luispa.ecommerce_api.api.dto.request.UpdateCategoryRequest;
+import com.spring.luispa.ecommerce_api.api.dto.response.CategoryResponse;
 import com.spring.luispa.ecommerce_api.domain.product.Category;
 import com.spring.luispa.ecommerce_api.services.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -7,6 +10,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,13 +32,13 @@ public class CategoryController {
     @GetMapping
     @Operation(summary = "List active categories", description = "Retrieve all active categories sorted by displayOrder")
     @ApiResponse(responseCode = "200", description = "List of categories")
-    public ResponseEntity<List<Category>> getAllCategories() {
+    public ResponseEntity<List<CategoryResponse>> getAllCategories() {
         return ResponseEntity.status(HttpStatus.OK).body(categoryService.findAllActiveOrdered());
     }
 
     @GetMapping("/roots")
     @Operation(summary = "List root categories", description = "Retrieves categories that have no parent (top-level")
-    public ResponseEntity<List<Category>> getRootCategories() {
+    public ResponseEntity<List<CategoryResponse>> getRootCategories() {
         return ResponseEntity.status(HttpStatus.OK).body(categoryService.findRootCategories());
     }
 
@@ -44,7 +48,7 @@ public class CategoryController {
             @ApiResponse(responseCode = "200", description = "Category found"),
             @ApiResponse(responseCode = "404", description = "Category not found")
     })
-    public ResponseEntity<Category> getCategoryById(
+    public ResponseEntity<CategoryResponse> getCategoryById(
             @Parameter(description = "Category ID", example = "1")
             @PathVariable Long id) {
         return ResponseEntity.status(HttpStatus.OK).body(categoryService.findById(id));
@@ -52,7 +56,7 @@ public class CategoryController {
 
     @GetMapping("/{id}/subcategories")
     @Operation(summary = "List subcategories", description = "Retrieves the child categories of a parent category")
-    public ResponseEntity<List<Category>> getSubcategories(
+    public ResponseEntity<List<CategoryResponse>> getSubcategories(
             @Parameter(description = "Parent category ID", example = "1")
             @PathVariable Long id) {
         return ResponseEntity.status(HttpStatus.OK).body(categoryService.findSubcategories(id));
@@ -60,7 +64,9 @@ public class CategoryController {
 
     @GetMapping("/{id}/path")
     @Operation(summary = "Get full path", description = "Returns full category hierarchy (e.g., Electronics -> Computers -> Laptops)")
-    public ResponseEntity<String> getCategoryPath(@PathVariable Long id) {
+    public ResponseEntity<String> getCategoryPath(
+            @Parameter(description = "Category ID", example = "1")
+            @PathVariable Long id) {
         return ResponseEntity.status(HttpStatus.OK).body(categoryService.getCategoryPath(id));
     }
 
@@ -68,16 +74,9 @@ public class CategoryController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Category> createCategory(
-            @Parameter(description = "Category name", example = "Electronics")
-            @RequestParam String name,
-            @Parameter(description = "Category description")
-            @RequestParam(required = false) String description,
-            @Parameter(description = "Parent category ID (for subcategories)")
-            @RequestParam(required = false) Long parentId,
-            @Parameter(description = "Display order", example = "1")
-            @RequestParam(required = false) Integer displayOrder) {
-        return ResponseEntity.status(HttpStatus.OK).body(categoryService.createCategory(name, description, parentId, displayOrder));
+    @Operation(summary = "Create category (admin)")
+    public ResponseEntity<CategoryResponse> createCategory(@Valid @RequestBody CreateCategoryRequest request) {
+        return ResponseEntity.status(HttpStatus.OK).body(categoryService.createCategory(request));
     }
 
     @PutMapping("/{id}")
@@ -88,18 +87,11 @@ public class CategoryController {
             @ApiResponse(responseCode = "404", description = "Category not found"),
             @ApiResponse(responseCode = "400", description = "Duplicate name")
     })
-    public ResponseEntity<Category> updateCategory(
+    public ResponseEntity<CategoryResponse> updateCategory(
             @Parameter(description = "Category ID", example = "1")
             @PathVariable Long id,
-            @Parameter(description = "New name")
-            @RequestParam(required = false) String name,
-            @Parameter(description = "New description")
-            @RequestParam(required = false) String description,
-            @Parameter(description = "New display order")
-            @RequestParam(required = false) Integer displayOrder,
-            @Parameter(description = "Enable/disable category")
-            @RequestParam(required = false) Boolean active) {
-        return ResponseEntity.status(HttpStatus.OK).body(categoryService.updateCategory(id, name, description, displayOrder, active));
+            @Valid @RequestBody UpdateCategoryRequest request) {
+        return ResponseEntity.status(HttpStatus.OK).body(categoryService.updateCategory(id, request));
     }
 
     @DeleteMapping("/{id}")
