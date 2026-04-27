@@ -18,7 +18,6 @@ import com.spring.luispa.ecommerce_api.domain.user.User;
 import com.spring.luispa.ecommerce_api.domain.user.UserRepository;
 import com.spring.luispa.ecommerce_api.mappers.OrderMapper;
 import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
-import com.spring.luispa.ecommerce_api.shared.enums.PaymentMethod;
 import com.spring.luispa.ecommerce_api.shared.enums.PaymentStatus;
 import com.spring.luispa.ecommerce_api.shared.exception.BusinessException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
@@ -140,7 +139,7 @@ public class OrderService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
-        Cart cart = cartRepository.findActiveCartWithItems(userId)
+        Cart cart = cartRepository.findCartForCheckout(userId)
                 .orElseThrow(() -> new BusinessException("No active cart found for user"));
 
         if (cart.getItems().isEmpty()) {
@@ -150,7 +149,7 @@ public class OrderService {
         validateStock(cart);
 
         Address shippingAddress = getAddress(request.getShippingAddressId(), userId);
-        Address billingAddress = getAddress(request.getBillingAddress(), userId);
+        Address billingAddress = getAddress(request.getBillingAddressId(), userId);
 
         Set<OrderItem> orderItems = cart.getItems().stream()
                 .map(cartItem -> new OrderItem.Builder(
@@ -179,8 +178,6 @@ public class OrderService {
         cart.markAsConverted();
 
         cartRepository.save(cart);
-
-        createPendingPayment(savedOrder);
 
         return orderMapper.toResponse(savedOrder);
     }
@@ -300,12 +297,12 @@ public class OrderService {
         return subtotal.multiply(new BigDecimal("0.10"));
     }
 
-    private void createPendingPayment(Order order) {
-        Payment payment = new Payment.Builder(order, PaymentMethod.CARD, order.getTotalAmount())
-                .build();
-
-        paymentRepository.save(payment);
-    }
+    //private void createPendingPayment(Order order) {
+    //    Payment payment = new Payment.Builder(order, PaymentMethod.CARD, order.getTotalAmount())
+    //            .build();
+    //
+    //    paymentRepository.save(payment);
+    //}
 
     // Administrator methods
 

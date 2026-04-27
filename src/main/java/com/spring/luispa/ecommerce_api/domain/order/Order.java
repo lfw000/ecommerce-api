@@ -8,6 +8,7 @@ import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -35,8 +36,8 @@ public class Order extends Auditable {
     @OneToMany(mappedBy = "order", cascade =  {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
+
     @NotNull
-    @Size(max = 20)
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private OrderStatus status;
@@ -47,7 +48,7 @@ public class Order extends Auditable {
     private BigDecimal subtotal;
 
     @NotNull
-    @Positive
+    @PositiveOrZero
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal shippingCost;
 

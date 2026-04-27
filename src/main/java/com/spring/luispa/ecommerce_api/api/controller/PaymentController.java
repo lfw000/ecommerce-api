@@ -43,7 +43,7 @@ public class PaymentController {
     public ResponseEntity<PaymentResponse> getPaymentByOrderId(@CurrentUser UserDetailsImpl currentUser,
                                                                @Parameter(description = "Order ID", example = "1")
                                                                @PathVariable Long orderId) {
-        PaymentResponse payment = paymentService.findByOrderId(orderId, currentUser.getId());
+        PaymentResponse payment = paymentService.findByOrderIdForUser(orderId, currentUser.getId());
 
         return ResponseEntity.status(HttpStatus.OK).body(payment);
     }

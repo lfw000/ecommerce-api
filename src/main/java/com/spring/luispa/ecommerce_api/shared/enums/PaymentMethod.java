@@ -1,7 +1,8 @@
 package com.spring.luispa.ecommerce_api.shared.enums;
 
 public enum PaymentMethod {
-    CARD,
+    CREDIT_CARD,
+    DEBIT_CARD,
     PAYPAL,
-    TRANSFER
+    BANK_TRANSFER,
 }

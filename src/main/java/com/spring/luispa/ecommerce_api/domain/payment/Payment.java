@@ -52,7 +52,7 @@ public class Payment extends Auditable {
      @Column(name = "transaction_id", length = 100)
      private String transactionId;
 
-     @Column(name = "payment_details", columnDefinition = "json")
+     @Column(name = "payment_details", columnDefinition = "TEXT")
      private String paymentDetails;
 
      @Column(name = "paid_at")
@@ -67,7 +67,7 @@ public class Payment extends Auditable {
      @Column(name = "refunded_at")
      private LocalDateTime refundedAt;
 
-     @Column(name = "refunded_amount", precision = 10, scale = 2)
+     @Column(name = "refund_amount", precision = 10, scale = 2)
      private BigDecimal refundAmount;
 
      @Column(name = "refund_reason", length = 500)
@@ -88,6 +88,7 @@ public class Payment extends Auditable {
         this.currency = builder.currency;
         this.transactionId = builder.transactionId;
         this.paymentDetails = builder.paymentDetails;
+        this.amount = builder.amount;
     }
 
     // Getters and setters

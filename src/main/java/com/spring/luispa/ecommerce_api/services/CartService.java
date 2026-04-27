@@ -73,7 +73,7 @@ public class CartService {
     }
 
     private Cart getOrCreateActiveCart(Long userId) {
-        return cartRepository.findByUserIdAndActiveTrue(userId)
+        return cartRepository.findActiveCartByUserId(userId)
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
                             .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
@@ -136,19 +136,19 @@ public class CartService {
     }
 
     public boolean hasItems(Long userId) {
-        Cart cart = cartRepository.findByUserIdAndActiveTrue(userId).orElse(null);
+        Cart cart = cartRepository.findActiveCartByUserId(userId).orElse(null);
 
         return cart != null && cart.getTotalItems() > 0;
     }
 
     public int getTotalItems(Long userId) {
-        Cart cart = cartRepository.findByUserIdAndActiveTrue(userId).orElse(null);
+        Cart cart = cartRepository.findActiveCartByUserId(userId).orElse(null);
 
         return cart !=  null ? cart.getTotalItems() : 0;
     }
 
     public java.math.BigDecimal getTotalAmount(Long userId) {
-        Cart cart = cartRepository.findByUserIdAndActiveTrue(userId).orElse(null);
+        Cart cart = cartRepository.findActiveCartByUserId(userId).orElse(null);
 
         return cart != null ? cart.getTotalAmount() : java.math.BigDecimal.ZERO;
     }

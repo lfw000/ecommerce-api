@@ -43,7 +43,7 @@ public class OrderItem extends AuditableBaseEntity {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
 
-    @Column(columnDefinition = "json")
+    @Column(columnDefinition = "TEXT")
     private String productSnapshot;
 
     @Column(name = "discount_percentage")
@@ -210,6 +210,8 @@ public class OrderItem extends AuditableBaseEntity {
         }
 
         private String createProductSnapshot(Product product) {
+            System.out.println("Generando snapshot");
+
             return String.format(
                     "{\"sku\":\"%s\",\"name\":\"%s\",\"description\":\"%s\",\"category\":\"%s\"}",
                     product.getSku(),

@@ -56,12 +56,14 @@ public class User extends AuditableBaseEntity {
     @OrderBy("defaultAddress DESC, id ASC")
     private List<Address> addresses = new ArrayList<>();
 
-    @OneToOne(mappedBy = "user", cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-    private Cart cart;
+    @OneToMany(mappedBy = "user",
+            cascade = {CascadeType.PERSIST, CascadeType.MERGE},
+            orphanRemoval = true)
+    @OrderBy("createdAt DESC")
+    private List<Cart> carts =  new ArrayList<>();
 
     @OneToMany(mappedBy = "user")
     private Set<Order> orders = new HashSet<>();
-
 
     public User() {
         // No-args constructor
@@ -143,14 +145,17 @@ public class User extends AuditableBaseEntity {
         this.addresses = addresses;
     }
 
-    public Cart getCart() {
-        return cart;
+    public List<Cart> getCarts() {
+        return carts;
     }
 
-    public void setCart(Cart cart) {
-        this.cart = cart;
-        if (cart != null) {
-            cart.setUser(this);
+    public void setCart(List<Cart> carts) {
+        this.carts = carts;
+
+        if (carts != null) {
+            for (Cart cart : carts) {
+                cart.setUser(this);
+            }
         }
     }
 
@@ -163,6 +168,16 @@ public class User extends AuditableBaseEntity {
     }
 
     // Domain methods
+
+    public void addCart(Cart cart) {
+        carts.add(cart);
+        cart.setUser(this);
+    }
+
+    public void removeCart(Cart cart) {
+        carts.remove(cart);
+        cart.setUser(null);
+    }
 
     public void addAddress(Address address) {
         addresses.add(address);
@@ -180,6 +195,13 @@ public class User extends AuditableBaseEntity {
 
     public void removeRole(Role role) {
         roles.remove(role);
+    }
+
+    public Cart getActiveCart() {
+        return carts.stream()
+                .filter(Cart::getActive)
+                .findFirst()
+                .orElse(null);
     }
 
     public String getFullName() {

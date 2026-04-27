@@ -9,6 +9,7 @@ import com.spring.luispa.ecommerce_api.domain.payment.Payment;
 import com.spring.luispa.ecommerce_api.domain.payment.PaymentRepository;
 import com.spring.luispa.ecommerce_api.domain.payment.RefundTransaction;
 import com.spring.luispa.ecommerce_api.mappers.PaymentMapper;
+import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
 import com.spring.luispa.ecommerce_api.shared.enums.PaymentStatus;
 import com.spring.luispa.ecommerce_api.shared.exception.BusinessException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
@@ -46,7 +47,7 @@ public class PaymentService {
         return paymentMapper.toResponse(payment);
     }
 
-    public PaymentResponse findByOrderId(Long orderId, Long userId) {
+    public PaymentResponse findByOrderIdForUser(Long orderId, Long userId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
 
@@ -88,8 +89,8 @@ public class PaymentService {
             throw new UnauthorizedException("Order does not belong to user");
         }
 
-        if (!order.isCancellable()) {
-            throw new BusinessException("Order cannot be paid in current status: " + order.getStatus());
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BusinessException("Order cannot be paid. Current status: " + order.getStatus());
         }
 
         if (paymentRepository.findByOrderId(orderId).isPresent()) {
@@ -100,13 +101,13 @@ public class PaymentService {
                 .currency(request.getCurrency() != null ? request.getCurrency() : "USD")
                 .build();
 
+        String paymentDetails = buildPaymentDetails(request);
+
         String transactionId = simulatePaymentGateway(payment, request);
 
-        payment.complete(transactionId, buildPaymentDetails(request));
+        payment.complete(transactionId, paymentDetails);
 
         Payment savedPayment = paymentRepository.save(payment);
-
-        order.confirmPayment(transactionId);
 
         return paymentMapper.toResponse(savedPayment);
     }
@@ -128,7 +129,7 @@ public class PaymentService {
     @Transactional
     public PaymentResponse refundPayment(Long paymentId, RefundRequest request) {
         Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Payment not found with id: " + paymentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
 
         if (!payment.isRefundable()) {
             throw new BusinessException("Payment cannot be refunded. Status: " + payment.getStatus());
@@ -136,12 +137,10 @@ public class PaymentService {
 
         payment.refund(request.getReason());
 
-        Payment savedPayment = paymentRepository.save(payment);
-
         Order order = payment.getOrder();
         order.cancel(request.getReason());
 
-        return paymentMapper.toResponse(savedPayment);
+        return paymentMapper.toResponse(payment);
     }
 
     @Transactional
@@ -186,14 +185,23 @@ public class PaymentService {
         return "tx_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
     }
 
+    // Private methods
+
     private String buildPaymentDetails(ProcessPaymentRequest request) {
-        // En un caso real, almacenar información como:
-        // - Últimos 4 dígitos de la tarjeta
-        // - Marca de la tarjeta (Visa, Mastercard)
-        // - ID del cliente en la pasarela
-        return String.format("{\"method\":\"%s\", \"currency\":\"%s\"}",
-                request.getPaymentMethod().name(),
-                request.getCurrency() != null ? request.getCurrency() : "USD");
+        StringBuilder details = new StringBuilder("{");
+        details.append("\"method\":\"").append(request.getPaymentMethod()).append("\",");
+        details.append("\"currency\":\"").append(request.getCurrency()).append("\"");
+
+        if (request.getCardLastFour() != null) {
+            details.append(",\"cardLastFour\":\"").append(request.getCardLastFour()).append("\"");
+        }
+        if (request.getCardBrand() != null) {
+            details.append(",\"cardBrand\":\"").append(request.getCardBrand()).append("\"");
+        }
+
+        details.append("}");
+
+        return details.toString();
     }
 
     @Transactional

@@ -16,7 +16,7 @@ public class CreateOrderRequest {
         example = "1",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "Billing address ID is required")
-    private Long billingAddress;
+    private Long billingAddressId;
 
     @Schema(description = "Shipping method",
         example = "express",
@@ -35,12 +35,12 @@ public class CreateOrderRequest {
         this.shippingAddressId = shippingAddressId;
     }
 
-    public Long getBillingAddress() {
-        return billingAddress;
+    public Long getBillingAddressId() {
+        return billingAddressId;
     }
 
-    public void setBillingAddress(Long billingAddress) {
-        this.billingAddress = billingAddress;
+    public void setBillingAddressId(Long billingAddressId) {
+        this.billingAddressId = billingAddressId;
     }
 
     public String getShippingMethod() {

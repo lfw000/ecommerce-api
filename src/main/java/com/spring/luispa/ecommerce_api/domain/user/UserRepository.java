@@ -79,9 +79,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("""
         SELECT u FROM User u
         LEFT JOIN FETCH u.roles
-        LEFT JOIN FETCH u.cart
+        LEFT JOIN FETCH u.carts
         WHERE u.email = :email   """)
-    Optional<User> findByEmailWithRolesAndCart(@Param("email") String email);
+    Optional<User> findByEmailWithRolesAndCarts(@Param("email") String email);
 
     /**
      * Find users with orders count
