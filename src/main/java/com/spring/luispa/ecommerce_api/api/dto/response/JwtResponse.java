@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.Set;
 
-@Schema(description = "Authentication response with JWT token")
+@Schema(description = "JWT authentication response")
 public class JwtResponse {
 
     @Schema(description = "JWT token",
@@ -24,11 +24,12 @@ public class JwtResponse {
             example = "usuario@example.com")
     private String email;
 
-    @Schema(description = "User first name",
+    @Schema(description = "First name",
             example = "Juan")
     private String firstName;
 
-    @Schema(description = "User last name", example = "Pérez")
+    @Schema(description = "Last name",
+            example = "Pérez")
     private String lastName;
 
     @Schema(description = "User roles", example = "[\"ROLE_USER\"]")

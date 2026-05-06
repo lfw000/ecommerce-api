@@ -1,16 +1,15 @@
 package com.spring.luispa.ecommerce_api.api.dto.request;
 
-import com.spring.luispa.ecommerce_api.domain.product.ProductAttributes;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.util.Map;
 
-@Schema(description = "Request to create a new product")
+@Schema(description = "Request object to create a new product")
 public class CreateProductRequest {
 
-    @Schema(description = "Unique product SKU",
+    @Schema(description = "Unique product SKU (Stock Keeping Unit)",
         example = "LAP-001",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "SKU is required")
@@ -36,7 +35,7 @@ public class CreateProductRequest {
     @Positive(message = "Price must be positive")
     private BigDecimal price;
 
-    @Schema(description = "Initial stock",
+    @Schema(description = "Initial stock quantity",
         example = "50",
         defaultValue = "0")
     @PositiveOrZero(message = "Stock cannot be negative")
@@ -48,15 +47,15 @@ public class CreateProductRequest {
     @NotNull(message = "Category ID is required")
     private Long categoryId;
 
+    @Schema(description = "Indicates whether the product is featured",
+            example = "false",
+            defaultValue = "false")
+    private boolean featured = false;
+
     @Schema(description = "Product attributes",
             example = "{\"color\": \"red\",\"size\":32}",
             defaultValue = "{}")
     private Map<String, String> attributes;
-
-    @Schema(description = "Indicates whether the product is featured",
-        example = "false",
-        defaultValue = "false")
-    private boolean featured = false;
 
     public String getSku() {
         return sku;
@@ -106,19 +105,19 @@ public class CreateProductRequest {
         this.categoryId = categoryId;
     }
 
-    public Map<String, String> getAttributes() {
-        return attributes;
-    }
-
-    public void setAttributes(Map<String, String> attributes) {
-        this.attributes = attributes;
-    }
-
     public boolean isFeatured() {
         return featured;
     }
 
     public void setFeatured(boolean featured) {
         this.featured = featured;
+    }
+
+    public Map<String, String> getAttributes() {
+        return attributes;
+    }
+
+    public void setAttributes(Map<String, String> attributes) {
+        this.attributes = attributes;
     }
 }

@@ -94,13 +94,22 @@ public class PaymentController {
     @Operation(summary = "Full refund (admin)", description = "Processes a full refund of the payment. Requires the ADMIN role.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Refund processed"),
-            @ApiResponse(responseCode = "400", description = "The payment is not-refundable")
+            @ApiResponse(responseCode = "400", description = "The payment is not-refundable"),
+            @ApiResponse(responseCode = "403", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "Payment not found")
     })
     public ResponseEntity<PaymentResponse> refundPayment(
+            @CurrentUser UserDetailsImpl currentUser,
             @Parameter(description = "Payment ID", example = "1")
             @PathVariable Long id,
             @Valid @RequestBody RefundRequest request) {
-        return ResponseEntity.ok(paymentService.refundPayment(id, request));
+
+        String userRole = currentUser.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")) ? "ADMIN" : "USER";
+
+        PaymentResponse response = paymentService.refundPayment(id, request, currentUser.getId(), userRole);
+
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
     @PostMapping("/{id}/partial-refund")

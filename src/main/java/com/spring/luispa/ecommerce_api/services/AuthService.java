@@ -15,16 +15,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthService {
 
-    private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
     private final UserService userService;
+    private final AuthenticationManager authenticationManager;
 
     public AuthService(AuthenticationManager authenticationManager,
                        JwtUtils jwtUtils,
                        UserService userService) {
-        this.authenticationManager = authenticationManager;
         this.jwtUtils = jwtUtils;
         this.userService = userService;
+        this.authenticationManager = authenticationManager;
     }
 
     public JwtResponse authenticate(LoginRequest request) {

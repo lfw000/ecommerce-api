@@ -7,44 +7,59 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Schema(description = "Response containing product data")
+@Schema(description = "Product information response")
 public class ProductResponse {
 
-    @Schema(description = "Product ID", example = "1")
+    @Schema(description = "Product ID",
+            example = "1")
     private Long id;
 
-    @Schema(description = "Unique SKU", example = "LAP-001")
+    @Schema(description = "Unique SKU",
+            example = "LAP-001")
     private String sku;
 
-    @Schema(description = "Product name", example = "Pro Gaming Laptop")
+    @Schema(description = "Product name",
+            example = "Pro Gaming Laptop")
     private String name;
 
-    @Schema(description = "Description", example = "High-end laptop...")
+    @Schema(description = "Product description",
+            example = "High-end gaming laptop with Intel i9")
     private String description;
 
-    @Schema(description = "Price", example = "1599.99")
+    @Schema(description = "Price",
+            example = "1599.99")
     private BigDecimal price;
 
-    @Schema(description = "Available stock", example = "50")
+    @Schema(description = "Available stock",
+            example = "50")
     private Integer stock;
 
-    @Schema(description = "Category ID", example = "1")
+    @Schema(description = "Category ID",
+            example = "1")
     private Long categoryId;
 
-    @Schema(description = "Category name", example = "Electronics")
+    @Schema(description = "Category name",
+            example = "Electronics")
     private String categoryName;
 
-    @Schema(description = "Active product", example = "true")
+    @Schema(description = "Whether product is active",
+            example = "true")
     private boolean active;
 
-    @Schema(description = "Product attributes", example = "{\"color\":\"red\"}")
-    private ProductAttributes attributes;
-
-    @Schema(description = "Featured product", example = "false")
+    @Schema(description = "Whether product is featured",
+            example = "false")
     private boolean featured;
+
+    @Schema(description = "Product attributes",
+            example = "{\"color\":\"red\"}")
+    private ProductAttributes attributes;
 
     @Schema(description = "List of product images")
     private List<ProductImageResponse> images;
+
+    //@Schema(description = "Product dimensions (L×W×H in cm)",
+    //        example = "{\"length\": 35, \"width\": 25, \"height\": 3}")
+    //private Map<String, BigDecimal> dimensions;
 
     @Schema(description = "Creation date", example = "2024-01-15T10:30:00")
     private LocalDateTime createdAt;

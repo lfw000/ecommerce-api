@@ -4,10 +4,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-@Schema(description = "Password change request")
+@Schema(description = "Request to change user password")
 public class ChangePasswordRequest {
 
-    @Schema(description = "User's current password",
+    @Schema(description = "Current password",
         requiredMode = Schema.RequiredMode.REQUIRED,
         format = "password")
     @NotBlank(message = "Current password is required")

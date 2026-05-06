@@ -62,16 +62,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = parseJwt(request);
 
             if (jwt != null) {
-                if (!jwtUtils.validateJwtToken(jwt)) {
-                    logger.warn("Invalid JWT token for request: {}", path);
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write("Invalid or expired JWT token");
-                    return;
-                }
+                jwtUtils.validateJwtTokenWithUser(jwt, userDetailsService);
 
                 String email = jwtUtils.getEmailFromJwtToken(jwt);
-                logger.debug("JWT token valid for user: {}", email);
-
                 UserDetails userDetails;
 
                 try {

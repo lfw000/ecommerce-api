@@ -1,43 +1,52 @@
 package com.spring.luispa.ecommerce_api.api.dto.response;
 
-import com.spring.luispa.ecommerce_api.domain.user.Address;
 import com.spring.luispa.ecommerce_api.domain.user.AddressType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(description = "Response containing address data")
+@Schema(description = "Address information response")
 public class AddressResponse {
 
-    @Schema(description = "Address ID", example = "1")
+    @Schema(description = "Address ID",
+            example = "1")
     private Long id;
 
-    @Schema(description = "Street and number", example = "123 New Ave.")
+    @Schema(description = "Street name and number",
+            example = "123 New Ave.")
     private String street;
 
-    @Schema(description = "Supplement", example = "5th floor")
+    @Schema(description = "Additional address information",
+            example = "5th floor")
     private String addressLine2;
 
-    @Schema(description = "City", example = "Hollywood")
+    @Schema(description = "City",
+            example = "Hollywood")
     private String city;
 
-    @Schema(description = "State", example = "California")
+    @Schema(description = "State or province",
+            example = "California")
     private String state;
 
-    @Schema(description = "Zip code", example = "06500")
+    @Schema(description = "Postal/ZIP code",
+            example = "06500")
     private String zipCode;
 
-    @Schema(description = "Country", example = "United States")
+    @Schema(description = "Country",
+            example = "United States")
     private String country;
 
-    @Schema(description = "Phone", example = "+10 1010 1010")
+    @Schema(description = "Phone number",
+            example = "+10 1010 1010")
     private String phoneNumber;
 
-    @Schema(description = "This is the primary address", example = "true")
+    @Schema(description = "Whether this is the default address",
+            example = "true")
     private boolean defaultAddress;
 
-    @Schema(description = "Address type", example = "SHIPPING")
+    @Schema(description = "Address type",
+            example = "SHIPPING")
     private AddressType addressType;
 
-    @Schema(description = "Formatted address",
+    @Schema(description = "Formatted address string",
         example = "123 New Ave., 5th Floor, Hollywood, US 06500, United States")
     private String formattedAddress;
 

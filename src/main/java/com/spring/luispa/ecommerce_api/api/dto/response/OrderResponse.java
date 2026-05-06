@@ -7,14 +7,14 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Schema(description = "Response containing purchase order data")
+@Schema(description = "Order information response")
 public class OrderResponse {
 
     @Schema(description = "Order ID",
             example = "1")
     private Long id;
 
-    @Schema(description = "Unique order number (public)",
+    @Schema(description = "Unique order number (public identifier)",
             example = "550e8400-e29b-41d4-a716-446655440000")
     private String orderNumber;
 
@@ -33,7 +33,7 @@ public class OrderResponse {
             example = "PAID")
     private OrderStatus status;
 
-    @Schema(description = "Subtotal (excluding shipping/taxes)",
+    @Schema(description = "Subtotal (without shipping/taxes)",
             example = "1299.98")
     private BigDecimal subtotal;
 
@@ -41,11 +41,11 @@ public class OrderResponse {
             example = "10.00")
     private BigDecimal shippingCost;
 
-    @Schema(description = "Taxes",
+    @Schema(description = "Tax amount",
             example = "130.00")
     private BigDecimal taxAmount;
 
-    @Schema(description = "Total (subtotal + shipping + tax)",
+    @Schema(description = "Total amount (subtotal + shipping + tax)",
             example = "1439.98")
     private BigDecimal totalAmount;
 
@@ -56,7 +56,7 @@ public class OrderResponse {
     private AddressResponse billingAddress;
 
     @Schema(description = "Shipping method",
-            example = "express")
+            example = "standard")
     private String shippingMethod;
 
     @Schema(description = "Tracking number",
@@ -75,7 +75,7 @@ public class OrderResponse {
             example = "2024-01-15T10:30:00")
     private LocalDateTime createdAt;
 
-    @Schema(description = "Payment details")
+    @Schema(description = "Payment information")
     private PaymentResponse payment;
 
     public Long getId() {

@@ -6,7 +6,7 @@ import com.spring.luispa.ecommerce_api.api.dto.response.CategoryResponse;
 import com.spring.luispa.ecommerce_api.domain.product.Category;
 import com.spring.luispa.ecommerce_api.domain.product.CategoryRepository;
 import com.spring.luispa.ecommerce_api.mappers.CategoryMapper;
-import com.spring.luispa.ecommerce_api.shared.exception.BusinessException;
+import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,7 +75,7 @@ public class CategoryService {
     @Transactional
     public CategoryResponse createCategory(CreateCategoryRequest request) {
         if (categoryRepository.existsByName(request.getName())) {
-            throw new BusinessException("Category already exists with name: " + request.getName());
+            throw new BusinessRuleException("Category already exists with name: " + request.getName());
         }
 
         Category category = new Category(request.getName());
@@ -100,7 +100,7 @@ public class CategoryService {
             categoryRepository.findByName(request.getName())
                     .ifPresent(existing -> {
                         if (!existing.getId().equals(id)) {
-                            throw new BusinessException("Category name already used: " + request.getName());
+                            throw new BusinessRuleException("Category name already used: " + request.getName());
                         }
                     });
             category.setName(request.getName());
@@ -128,11 +128,11 @@ public class CategoryService {
 
         List<Category> subcategories = categoryRepository.findByParentCategoryId(id);
         if (!subcategories.isEmpty()) {
-            throw new BusinessException("Cannot delete category with subcategories. Delete subcategories first.");
+            throw new BusinessRuleException("Cannot delete category with subcategories. Delete subcategories first.");
         }
 
         if (!category.getProducts().isEmpty()) {
-            throw new BusinessException("Cannot delete category with products. Remove or reassign products first.");
+            throw new BusinessRuleException("Cannot delete category with products. Remove or reassign products first.");
         }
 
         category.setActive(false);
@@ -148,7 +148,7 @@ public class CategoryService {
             Category newParent = findCategoryEntity(newParentId);
 
             if (isDescendant(newParent, categoryId)) {
-                throw new BusinessException("Cannot move category to its own descendant");
+                throw new BusinessRuleException("Cannot move category to its own descendant");
             }
 
             category.setParentCategory(newParent);

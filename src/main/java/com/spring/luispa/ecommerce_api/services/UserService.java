@@ -10,7 +10,9 @@ import com.spring.luispa.ecommerce_api.domain.user.*;
 import com.spring.luispa.ecommerce_api.mappers.AddressMapper;
 import com.spring.luispa.ecommerce_api.mappers.UserMapper;
 import com.spring.luispa.ecommerce_api.shared.enums.RoleName;
-import com.spring.luispa.ecommerce_api.shared.exception.BusinessException;
+import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
+import com.spring.luispa.ecommerce_api.shared.exception.DuplicateResourceException;
+import com.spring.luispa.ecommerce_api.shared.exception.MissingDefaultRoleException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,6 @@ public class UserService {
     private final UserMapper userMapper;
     private final AddressMapper addressMapper;
     private final PasswordEncoder passwordEncoder;
-
 
     public UserService(UserRepository userRepository,
                        RoleRepository roleRepository,
@@ -88,14 +89,14 @@ public class UserService {
     @Transactional
     public UserResponse register(RegisterRequest request){
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new BusinessException("Email already registered: " + request.getEmail());
+            throw new DuplicateResourceException("Email already registered");
         }
 
         User user = userMapper.toEntity(request);
         user.setPassword(passwordEncoder.encode(user.getPassword()));
 
         Role userRole = roleRepository.findByName(RoleName.ROLE_USER)
-                .orElseThrow(() -> new ResourceNotFoundException("Default role not found"));
+                .orElseThrow(() -> new MissingDefaultRoleException("Default role not configured"));
 
         user.addRole(userRole);
 
@@ -126,7 +127,7 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
-            throw new BusinessException("Current password is Incorrect");
+            throw new BusinessRuleException("Current password is incorrect");
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
@@ -212,7 +213,7 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
         if (!address.getUser().getId().equals(userId)) {
-            throw new BusinessException("Address does not belong to the user");
+            throw new BusinessRuleException("Address does not belong to the user");
         }
 
         addressRepository.clearDefaultAddressFlag(userId);
@@ -226,7 +227,7 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
         if (!address.getUser().getId().equals(userId)) {
-            throw new BusinessException("Address does not belong to the user");
+            throw new BusinessRuleException("Address does not belong to the user");
         }
 
         if (address.getDefaultAddress()) {

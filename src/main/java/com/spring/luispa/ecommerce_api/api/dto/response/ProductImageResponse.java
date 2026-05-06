@@ -2,23 +2,27 @@ package com.spring.luispa.ecommerce_api.api.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(description = "Response containing product image data")
+@Schema(description = "Product image information")
 public class ProductImageResponse {
 
-    @Schema(description = "Image ID", example = "1")
+    @Schema(description = "Image ID",
+            example = "1")
     private Long id;
 
     @Schema(description = "Image URL",
         example = "https://cdn.ecommerce.com/images/product-1.jpg")
     private String imageUrl;
 
-    @Schema(description = "SEO alt text", example = "Pro Gaming Laptop - Front View")
+    @Schema(description = "SEO alt text",
+            example = "Pro Gaming Laptop - Front View")
     private String altText;
 
-    @Schema(description = "Display order", example = "0")
+    @Schema(description = "Display order",
+            example = "0")
     private Integer displayOrder;
 
-    @Schema(description = "Is main image", example = "true")
+    @Schema(description = "Whether this is the main image",
+            example = "true")
     private boolean main;
 
     public Long getId() {

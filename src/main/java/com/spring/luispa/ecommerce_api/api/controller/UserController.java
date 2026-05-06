@@ -26,7 +26,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
-@Tag(name = "Users", description = "Management of users profiles and addresses")
+@Tag(name = "Users", description = "User profile and address management")
 @SecurityRequirement(name = "bearerAuth")
 public class UserController {
 
@@ -37,9 +37,10 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    @Operation(summary = "Get current profile", description = "Returns the authenticated user's data")
+    @Operation(summary = "Get current user profile",
+            description = "Returns the profile information of the authenticated user")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Profile retrieved successfully",
+            @ApiResponse(responseCode = "200", description = "Profile retrieved",
                     content = @Content(schema = @Schema(implementation = UserResponse.class))),
             @ApiResponse(responseCode = "401", description = "Not authenticated")
     })
@@ -48,9 +49,10 @@ public class UserController {
      }
 
     @PutMapping("/me")
-    @Operation(summary = "Update profile", description = "Updates the first and last name of the authenticated user")
+    @Operation(summary = "Update user profile",
+            description = "Updates the first and last name of the authenticated user")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Profile updated successfully"),
+            @ApiResponse(responseCode = "200", description = "Profile updated"),
             @ApiResponse(responseCode = "400", description = "Invalid data"),
             @ApiResponse(responseCode = "401", description = "Not authenticated")
     })
@@ -60,10 +62,11 @@ public class UserController {
      }
 
     @PostMapping("/me/change-password")
-    @Operation(summary = "Change password", description = "Change the authenticated user's password")
+    @Operation(summary = "Change password",
+            description = "Change the password of the authenticated user")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Password successfully updated"),
-            @ApiResponse(responseCode = "400", description = "Incorrect current password or invalid data"),
+            @ApiResponse(responseCode = "200", description = "Password changed"),
+            @ApiResponse(responseCode = "400", description = "Current password incorrect"),
             @ApiResponse(responseCode = "401", description = "Not authenticated")
     })
     public ResponseEntity<Void> changePassword(@CurrentUser UserDetailsImpl currentUser,
@@ -73,14 +76,16 @@ public class UserController {
      }
 
     @GetMapping("/me/addresses")
-    @Operation(summary = "List of addresses", description = "Retrieves all of the user's saved addresses")
+    @Operation(summary = "Get user addresses",
+            description = "Return all addresses of the authenticated user")
     @ApiResponse(responseCode = "200", description = "List of addresses")
     public ResponseEntity<List<AddressResponse>> getAddress(@CurrentUser UserDetailsImpl currentUser) {
         return ResponseEntity.status(HttpStatus.OK).body(userService.getUserAddresses(currentUser.getId()));
      }
 
     @GetMapping("/me/addresses/default")
-    @Operation(summary = "Get primary address", description = "Returns the address marked as the default")
+    @Operation(summary = "Get primary address",
+            description = "Return the default address of the authenticated user")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Primary address found"),
             @ApiResponse(responseCode = "404", description = "No primary address")
@@ -90,20 +95,22 @@ public class UserController {
      }
 
     @PostMapping("/me/addresses")
-    @Operation(summary = "Add address", description = "Adds a new address to the user's profile")
+    @Operation(summary = "Add a new address",
+            description = "Adds a new address to the user's profile")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Address successfully added"),
+            @ApiResponse(responseCode = "201", description = "Address successfully added"),
             @ApiResponse(responseCode = "400", description = "Invalid address data")
     })
     public ResponseEntity<AddressResponse> addAddress(@CurrentUser UserDetailsImpl currentUser,
                                                       @Valid @RequestBody AddAddressRequest request) {
-        return ResponseEntity.status(HttpStatus.OK).body(userService.addAddress(currentUser.getId(), request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(userService.addAddress(currentUser.getId(), request));
      }
 
     @PutMapping("/me/addresses/{addressId}/default")
-    @Operation(summary = "Set address as primary", description = "Sets an address as the user's default address")
+    @Operation(summary = "Set address as primary",
+            description = "Marks an address as the default for the user")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Primary address updated"),
+            @ApiResponse(responseCode = "200", description = "Primary address set"),
             @ApiResponse(responseCode = "404", description = "Address not found")
     })
     public ResponseEntity<Void> setDefaultAddress(@CurrentUser UserDetailsImpl currentUser,
@@ -115,7 +122,8 @@ public class UserController {
      }
 
     @DeleteMapping("/me/addresses/{addressId}")
-    @Operation(summary = "Delete address", description = "Deletes an address from the user's profile")
+    @Operation(summary = "Delete address",
+            description = "Removes an address from the user's profile")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Address deleted"),
             @ApiResponse(responseCode = "404", description = "Address not found"),
@@ -133,7 +141,8 @@ public class UserController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "List all users (admin)", description = "Retrieves all users in the system. Requires ADMIN role.")
+    @Operation(summary = "List all users (admin)",
+            description = "Retrieves all users in the system. Requires ADMIN role.")
     @ApiResponse(responseCode = "200", description = "List of users")
     public ResponseEntity<List<UserResponse>> getAllUsers() {
         return ResponseEntity.status(HttpStatus.OK).body(userService.findAll());
@@ -141,7 +150,8 @@ public class UserController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Get user by ID (admin)", description = "Returns a specific user. Requires ADMIN role.")
+    @Operation(summary = "Get user by ID (admin)",
+            description = "Returns a specific user. Requires ADMIN role.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "User found"),
             @ApiResponse(responseCode = "404", description = "User not found")
@@ -154,7 +164,8 @@ public class UserController {
 
     @PutMapping("/{id}/enable")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Enable user (admin)", description = "Enables a user's account. Requires the ADMIN role.")
+    @Operation(summary = "Enable user (admin)",
+            description = "Enables a user's account. Requires the ADMIN role.")
     public ResponseEntity<Void> enableUser(
             @Parameter(description = "User ID", example = "1")
             @PathVariable Long id) {

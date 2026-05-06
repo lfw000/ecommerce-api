@@ -2,6 +2,7 @@ package com.spring.luispa.ecommerce_api.security;
 
 import com.spring.luispa.ecommerce_api.domain.user.User;
 import com.spring.luispa.ecommerce_api.domain.user.UserRepository;
+import com.spring.luispa.ecommerce_api.shared.exception.UserNotFoundException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -21,7 +22,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository.findWithRolesByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
 
         return UserDetailsImpl.build(user);
     }

@@ -1,5 +1,6 @@
 package com.spring.luispa.ecommerce_api.security;
 
+import com.spring.luispa.ecommerce_api.shared.exception.*;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
@@ -50,90 +51,72 @@ public class JwtUtils {
                 .getSubject();
     }
 
-    public boolean validateJwtToken(String authToken) {
+    public void validateJwtToken(String authToken) {
         if (authToken == null || authToken.isBlank()) {
-            logger.warn("JWT token is null or empty");
-            return false;
+            throw new JwtMalformedException("JWT token is null or empty");
         }
 
         try {
             Jws<Claims> claimsJws = Jwts.parser()
                     .verifyWith(getSigningKey())
-                    .build().parseClaimsJws(authToken);
+                    .build()
+                    .parseClaimsJws(authToken);
 
             Claims claims = claimsJws.getBody();
 
             Date expiration = claims.getExpiration();
             if (expiration == null) {
-                logger.warn("JWT has no expiration date");
-                return false;
+                throw new JwtMalformedException("JWT has no expiration date");
             }
 
             if (expiration.before(new Date())) {
-                logger.warn("JWT token is expired. Expired at: {}", expiration);
-                return false;
+                throw new JwtExpiredException(expiration);
             }
 
             Date issuedAt = claims.getIssuedAt();
             if (issuedAt != null && issuedAt.after(new Date())) {
-                logger.warn("JWT token issued in the future: {}", issuedAt);
-                return false;
+                throw new JwtMalformedException("JWT token issued in the future");
             }
 
             String subject = claims.getSubject();
             if (subject == null || subject.isBlank()) {
-                logger.warn("JWT token has no subject (email)");
-                return false;
+                throw new JwtMalformedException("JWT token has no subject (email)");
             }
 
             logger.debug("JWT token is valid for user: {}", subject);
-            return true;
         } catch (ExpiredJwtException e) {
-            logger.warn("JWT token expired at: {}", e.getClaims().getExpiration());
-            return false;
+            throw new JwtExpiredException(e.getClaims().getExpiration());
         } catch (MalformedJwtException e) {
-            logger.warn("Malformed JWT token: {}", e.getMessage());
-            return false;
+            throw new JwtMalformedException(e.getMessage());
         } catch (SignatureException e) {
-            logger.warn("Invalid JWWT signature: {}", e.getMessage());
-            return false;
+            throw new JwtSignatureException(e.getMessage());
         } catch (UnsupportedJwtException e) {
-            logger.warn("Unsupported JWT token: {}", e.getMessage());
-            return false;
+            throw new JwtUnsupportedException(e.getMessage());
         } catch (IllegalArgumentException e) {
-            logger.warn("JWT claims string is empty: {}", e.getMessage());
-            return false;
+            throw new JwtMalformedException(e.getMessage());
         }
     }
 
-    public boolean validateJwtTokenWithUser(String authToken, UserDetailsService userDetailsService) {
-        if (!validateJwtToken(authToken)) {
-            return false;
-        }
+    public void validateJwtTokenWithUser(String authToken, UserDetailsService userDetailsService) {
+        validateJwtToken(authToken);
 
         try {
             String email = getEmailFromJwtToken(authToken);
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
             if (!userDetails.isEnabled()) {
-                logger.warn("User is disabled: {}", email);
-                return false;
+                throw new UserDisabledException(email);
             }
 
             if (!userDetails.isAccountNonExpired()) {
-                logger.warn("User account is expired: {}", email);
-                return false;
+                throw new UserAccountExpiredException(email);
             }
 
             if (!userDetails.isAccountNonLocked()) {
-                logger.warn("User account is locked: {}", email);
-                return false;
+                throw new UserLockedException(email);
             }
-
-            return true;
         } catch (UsernameNotFoundException e) {
-            logger.warn("User not found for JWT token: {}", e.getMessage());
-            return false;
+            throw new UserNotFoundException();
         }
     }
 }

@@ -10,7 +10,9 @@ import com.spring.luispa.ecommerce_api.domain.product.ProductRepository;
 import com.spring.luispa.ecommerce_api.domain.user.User;
 import com.spring.luispa.ecommerce_api.domain.user.UserRepository;
 import com.spring.luispa.ecommerce_api.mappers.CartMapper;
-import com.spring.luispa.ecommerce_api.shared.exception.BusinessException;
+import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
+import com.spring.luispa.ecommerce_api.shared.exception.InsufficientStockException;
+import com.spring.luispa.ecommerce_api.shared.exception.ProductNotActiveException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,14 +26,15 @@ public class CartService {
     private final ProductRepository productRepository;
     private final CartMapper cartMapper;
 
-    public CartService(CartRepository cartRepository, UserRepository userRepository, ProductRepository productRepository, CartMapper cartMapper) {
+    public CartService(CartRepository cartRepository,
+                       UserRepository userRepository,
+                       ProductRepository productRepository,
+                       CartMapper cartMapper) {
         this.cartRepository = cartRepository;
         this.userRepository = userRepository;
         this.productRepository = productRepository;
         this.cartMapper = cartMapper;
     }
-
-    // Helper methods
 
     public CartResponse getActiveCart(Long userId) {
         Cart cart = getOrCreateActiveCart(userId);
@@ -48,14 +51,18 @@ public class CartService {
     @Transactional
     public CartResponse addToCart(Long userId, AddToCartRequest request) {
         Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found with id: " + request.getProductId()));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + request.getProductId()));
 
         if (!product.getActive()) {
-            throw new BusinessException("Product is not available: " + product.getName());
+            throw new ProductNotActiveException(product.getId(), product.getSku());
         }
 
         if (request.getQuantity() > product.getStock()) {
-            throw new BusinessException("Insufficient stock. Available: " +  product.getStock());
+            throw new InsufficientStockException(
+                    product.getId(),
+                    product.getSku(),
+                    product.getStock(),
+                    request.getQuantity());
         }
 
         Cart cart = getOrCreateActiveCartWithItems(userId);
@@ -63,23 +70,16 @@ public class CartService {
 
         Cart savedCart = cartRepository.save(cart);
 
-        CartResponse cartResponse = cartMapper.toResponse(savedCart);
-
-        //return cartMapper.toResponse(savedCart);
-
-        System.out.println(cartResponse);
-
-        return cartResponse;
+        return cartMapper.toResponse(savedCart);
     }
 
     private Cart getOrCreateActiveCart(Long userId) {
         return cartRepository.findActiveCartByUserId(userId)
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
                     return new Cart(user);
-
                 });
     }
 
@@ -87,7 +87,7 @@ public class CartService {
         return cartRepository.findActiveCartWithItems(userId)
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
                     return new Cart(user);
                 });
@@ -99,15 +99,19 @@ public class CartService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + request.getProductId()));
 
         if (!product.getActive()) {
-            throw new BusinessException("Product is not available: " + product.getName());
+            throw new ProductNotActiveException(product.getId(), product.getSku());
         }
 
         if (request.getQuantity() > product.getStock()) {
-            throw new BusinessException("Insufficient stock. Available: " +  product.getStock());
+            throw new InsufficientStockException(
+                    product.getId(),
+                    product.getSku(),
+                    product.getStock(),
+                    request.getQuantity());
         }
 
         Cart cart = cartRepository.findActiveCartWithItems(userId)
-                .orElseThrow(() -> new BusinessException("No active cart found for user"));
+                .orElseThrow(() -> new BusinessRuleException("No active cart found for user"));
 
         cart.updateItemQuantity(product, request.getQuantity());
 
@@ -120,7 +124,7 @@ public class CartService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
         Cart cart = cartRepository.findActiveCartWithItems(userId)
-                .orElseThrow(() -> new BusinessException("No active cart found for user"));
+                .orElseThrow(() -> new BusinessRuleException("No active cart found for user"));
 
         cart.removeItem(product);
 
@@ -130,7 +134,7 @@ public class CartService {
     @Transactional
     public void clearCart(Long userId) {
         Cart cart = cartRepository.findActiveCartWithItems(userId)
-                .orElseThrow(() -> new BusinessException("No active cart found for user"));
+                .orElseThrow(() -> new BusinessRuleException("No active cart found for user"));
 
         cart.clear();
     }

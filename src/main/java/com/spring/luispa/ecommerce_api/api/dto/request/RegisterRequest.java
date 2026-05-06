@@ -5,11 +5,11 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-@Schema(description = "New user registration request")
+@Schema(description = "Request object for user registration")
 public class RegisterRequest {
 
-    @Schema(description = "User email (unique)",
-        example = "user@example.com",
+    @Schema(description = "User email address (unique)",
+        example = "newuser@example.com",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
@@ -24,14 +24,14 @@ public class RegisterRequest {
     @Size(min = 8, max = 60, message = "Password must be between 8 and 60 characters")
     private String password;
 
-    @Schema(description = "User's first name",
+    @Schema(description = "User first name",
         example = "Johh",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "First name is required")
     @Size(max = 50)
     private String firstName;
 
-    @Schema(description = "User's last name",
+    @Schema(description = "User last name",
         example = "Smith",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "Last name is required")

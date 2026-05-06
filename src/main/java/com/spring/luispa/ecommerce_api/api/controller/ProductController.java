@@ -4,6 +4,12 @@ import com.spring.luispa.ecommerce_api.api.dto.request.CreateProductRequest;
 import com.spring.luispa.ecommerce_api.api.dto.request.UpdateProductRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.ProductResponse;
 import com.spring.luispa.ecommerce_api.services.ProductService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +24,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/products")
+@Tag(name = "Products", description = "Product catalog management")
 public class ProductController {
 
     private final ProductService productService;
@@ -27,17 +34,28 @@ public class ProductController {
     }
 
     @GetMapping
+    @Operation(summary = "List products",
+        description = "Returns a paginated list of active products")
+    @ApiResponse(responseCode = "200", description = "Products retrieved",
+        content = @Content(schema = @Schema(implementation = Page.class)))
     public ResponseEntity<Page<ProductResponse>> getAllProducts(
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
         return ResponseEntity.status(HttpStatus.OK).body(productService.findAll(pageable));
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get product by ID",
+        description = "Returns a single product by its ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Product found"),
+            @ApiResponse(responseCode = "404", description = "Product not found")})
     public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
         return ResponseEntity.status(HttpStatus.OK).body(productService.findById(id));
     }
 
     @GetMapping("/sku/{sku}")
+    @Operation(summary = "Get product by SKU",
+        description = "Returns a single product by its SKU code")
     public ResponseEntity<ProductResponse> getProductBySku(@PathVariable String sku) {
         return ResponseEntity.status(HttpStatus.OK).body(productService.findBySku(sku));
     }

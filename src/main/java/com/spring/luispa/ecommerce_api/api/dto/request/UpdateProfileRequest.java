@@ -6,18 +6,18 @@ import jakarta.validation.constraints.Size;
 @Schema(description = "Request to update user profile")
 public class UpdateProfileRequest {
 
-    @Schema(description = "User's first name",
+    @Schema(description = "New first name",
         example = "Charles",
         requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     @Size(max = 50)
     private String firstName;
 
+    @Schema(description = "New last name",
+        example = "Smith",
+        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     @Size(max = 50)
     private String lastName;
 
-    @Schema(description = "User's new last name",
-        example = "Carson",
-        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     public String getFirstName() {
         return firstName;
     }

@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-@Schema(description = "Payment processing request")
+@Schema(description = "Request object to process a payment")
 public class ProcessPaymentRequest {
 
     @Schema(description = "Payment method",
@@ -16,7 +16,7 @@ public class ProcessPaymentRequest {
     @NotNull(message = "Payment method is required")
     private PaymentMethod paymentMethod;
 
-    @Schema(description = "Payment currency",
+    @Schema(description = "Currency code (ISO 4217)",
             example = "USD",
             defaultValue = "USD",
             pattern = "^[A-Z]{3}$")
@@ -25,7 +25,7 @@ public class ProcessPaymentRequest {
 
     // Optional fields for card payments
 
-    @Schema(description = "Last 4 digits of the card",
+    @Schema(description = "Last 4 digits of the card (for card payments) ",
         example = "4242")
     @Size(min = 4, max = 4, message = "Card last four must be exactly 4 digits")
     private String cardLastFour;

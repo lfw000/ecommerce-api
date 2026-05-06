@@ -1,5 +1,6 @@
 package com.spring.luispa.ecommerce_api.services;
 
+import com.spring.luispa.ecommerce_api.api.dto.request.CancelOrderRequest;
 import com.spring.luispa.ecommerce_api.api.dto.request.ProcessPaymentRequest;
 import com.spring.luispa.ecommerce_api.api.dto.request.RefundRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.PaymentResponse;
@@ -9,9 +10,10 @@ import com.spring.luispa.ecommerce_api.domain.payment.Payment;
 import com.spring.luispa.ecommerce_api.domain.payment.PaymentRepository;
 import com.spring.luispa.ecommerce_api.domain.payment.RefundTransaction;
 import com.spring.luispa.ecommerce_api.mappers.PaymentMapper;
+import com.spring.luispa.ecommerce_api.shared.enums.CancellationReason;
 import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
 import com.spring.luispa.ecommerce_api.shared.enums.PaymentStatus;
-import com.spring.luispa.ecommerce_api.shared.exception.BusinessException;
+import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import com.spring.luispa.ecommerce_api.shared.exception.UnauthorizedException;
 import org.springframework.stereotype.Service;
@@ -90,11 +92,11 @@ public class PaymentService {
         }
 
         if (order.getStatus() != OrderStatus.PENDING) {
-            throw new BusinessException("Order cannot be paid. Current status: " + order.getStatus());
+            throw new BusinessRuleException("Order cannot be paid. Current status: " + order.getStatus());
         }
 
         if (paymentRepository.findByOrderId(orderId).isPresent()) {
-            throw new BusinessException("Payment already exists for this order");
+            throw new BusinessRuleException("Payment already exists for this order");
         }
 
         Payment payment = new Payment.Builder(order, request.getPaymentMethod(), order.getTotalAmount())
@@ -127,20 +129,43 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentResponse refundPayment(Long paymentId, RefundRequest request) {
+    public PaymentResponse refundPayment(Long paymentId, RefundRequest request, Long userId, String userRole) {
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
 
-        if (!payment.isRefundable()) {
-            throw new BusinessException("Payment cannot be refunded. Status: " + payment.getStatus());
+        Order order = payment.getOrder();
+
+        if (!"ADMIN".equals(userRole) && !order.getUser().getId().equals(userId)) {
+            throw new UnauthorizedException("Cannot refund this payment");
         }
 
-        payment.refund(request.getReason());
+        if (!payment.isRefundable()) {
+            throw new BusinessRuleException(String.format("Payment cannot be refunded. Current status: %s", payment.getStatus()));
+        }
 
-        Order order = payment.getOrder();
-        order.cancel(request.getReason());
+        if (order.getStatus() != OrderStatus.SHIPPED || order.getStatus() != OrderStatus.DELIVERED) {
+            throw new BusinessRuleException("Cannot refund payment for shipped or delivered orders. Please process a return instead.");
+        }
 
-        return paymentMapper.toResponse(payment);
+        PaymentResponse response;
+
+        if (request.getAmount() == null || request.getAmount().compareTo(payment.getAmount()) == 0) {
+            payment.refund(request.getReason());
+        } else {
+            payment.partialRefund(request.getAmount(), request.getReason());
+        }
+
+        response = paymentMapper.toResponse(payment);
+
+        if (request.isCancelOrderAfterRefund()) {
+            CancelOrderRequest cancelRequest = new CancelOrderRequest(
+                    CancellationReason.ADMIN_CANCELLED,
+                    "Order cancelled after refund: " + request.getReason()
+            );
+            order.cancel(cancelRequest, userId, userRole);
+        }
+
+        return response;
     }
 
     @Transactional
@@ -149,11 +174,11 @@ public class PaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found with id: " + paymentId));
 
         if (!payment.isRefundable()) {
-            throw new BusinessException("Payment cannot be refunded. Status: " + payment.getStatus());
+            throw new BusinessRuleException("Payment cannot be refunded. Status: " + payment.getStatus());
         }
 
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("Refund amount must be positive");
+            throw new BusinessRuleException("Refund amount must be positive");
         }
 
         payment.partialRefund(request.getAmount(), request.getReason());

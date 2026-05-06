@@ -6,22 +6,22 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
-@Schema(description = "Response containing user data")
+@Schema(description = "User information response")
 public class UserResponse {
 
     @Schema(description = "User ID", example = "1")
     private Long id;
 
-    @Schema(description = "Email", example = "usuario@example.com")
+    @Schema(description = "User email", example = "usuario@example.com")
     private String email;
 
-    @Schema(description = "First Name", example = "Juan")
+    @Schema(description = "First name", example = "Juan")
     private String firstName;
 
-    @Schema(description = "Last Name", example = "Pérez")
+    @Schema(description = "Last name", example = "Pérez")
     private String lastName;
 
-    @Schema(description = "Account enabled", example = "true")
+    @Schema(description = "Whether the account is enabled", example = "true")
     private boolean enabled;
 
     @Schema(description = "List of user roles",

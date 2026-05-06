@@ -1,5 +1,6 @@
 package com.spring.luispa.ecommerce_api.api.controller;
 
+import com.spring.luispa.ecommerce_api.api.dto.request.CancelOrderRequest;
 import com.spring.luispa.ecommerce_api.api.dto.request.CreateOrderRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.OrderResponse;
 import com.spring.luispa.ecommerce_api.security.CurrentUser;
@@ -92,14 +93,15 @@ public class OrderController {
     public ResponseEntity<OrderResponse> cancelOrder(@CurrentUser UserDetailsImpl currentUser,
                                                      @Parameter(description = "Order ID", example = "1")
                                                      @PathVariable Long id,
-                                                     @Parameter(description = "Reason for cancellation", example = "Change my mind")
-                                                     @RequestParam String reason) {
-        OrderResponse order = orderService.findById(id);
-        if (!order.getUserId().equals(currentUser.getId())) {
-            return ResponseEntity.status(403).build();
-        }
+                                                     @Valid @RequestBody CancelOrderRequest request) {
 
-        return ResponseEntity.status(HttpStatus.OK).body(orderService.cancelOrder(id, currentUser.getId(), reason));
+
+        String userRole = currentUser.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")) ? "ADMIN" : "USER";
+
+        OrderResponse response = orderService.cancelOrder(id, request, currentUser.getId(), userRole);
+
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
     // Administrator methods

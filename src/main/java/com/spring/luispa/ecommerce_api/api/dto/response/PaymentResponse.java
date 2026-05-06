@@ -7,18 +7,18 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Schema(description = "Response containing payment details")
+@Schema(description = "Payment information response")
 public class PaymentResponse {
 
     @Schema(description = "Payment ID",
             example = "1")
     private Long id;
 
-    @Schema(description = "Unique payment number (public)",
+    @Schema(description = "Payment number (public identifier)",
         example = "660e8400-e29b-41d4-a716-446655440001")
     private String paymentNumber;
 
-    @Schema(description = "Associated order ID",
+    @Schema(description = "Order ID",
             example = "1")
     private Long orderId;
 
@@ -38,7 +38,7 @@ public class PaymentResponse {
             example = "USD")
     private String currency;
 
-    @Schema(description = "Gateway transaction ID",
+    @Schema(description = "Transaction ID from gateway",
         example = "tx_1234567890abcdef")
     private String transactionId;
 
@@ -125,22 +125,6 @@ public class PaymentResponse {
     public void setPaidAt(LocalDateTime paidAt) {
         this.paidAt = paidAt;
     }
-
-    //public LocalDateTime getFailedAt() {
-    //    return failed;
-    //}
-    //
-    //public void setFailedAt(LocalDateTime failedAt) {
-    //    this.failedAt = failedAt;
-    //}
-    //
-    //public String getFailureReason() {
-    //    return failureReason;
-    //}
-    //
-    //public void setFailureReason(String failureReason) {
-    //    this.failureReason = failureReason;
-    //}
 
     public BigDecimal getRefundAmount() {
         return refundAmount;

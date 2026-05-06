@@ -3,16 +3,16 @@ package com.spring.luispa.ecommerce_api.api.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
-@Schema(description = "Order creation request (checkout)")
+@Schema(description = "Request object to create an order from cart")
 public class CreateOrderRequest {
 
-    @Schema(description = "Shipping address ID",
+    @Schema(description = "ID of the shipping address",
         example = "1",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "Shipping address ID is required")
     private Long shippingAddressId;
 
-    @Schema(description = "Billing address ID",
+    @Schema(description = "ID of the billing address",
         example = "1",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "Billing address ID is required")
@@ -23,7 +23,7 @@ public class CreateOrderRequest {
         allowableValues = {"standard", "express", "overnight"})
     private String shippingMethod;
 
-    @Schema(description = "Additional notes for the order",
+    @Schema(description = "Additional order notes",
         example = "Please call before delivery")
     private String notes;
 

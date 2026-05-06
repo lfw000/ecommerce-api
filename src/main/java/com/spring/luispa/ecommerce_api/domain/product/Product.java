@@ -1,6 +1,7 @@
 package com.spring.luispa.ecommerce_api.domain.product;
 
 import com.spring.luispa.ecommerce_api.shared.common.Auditable;
+import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 
@@ -230,7 +231,7 @@ public class Product extends Auditable {
 
     public void decreaseStock(Integer quantity) {
         if (!hasStock(quantity)) {
-            throw new IllegalStateException("Insufficient stock for product " + getSku());
+            throw new BusinessRuleException("Insufficient stock for product " + getSku());
         }
         this.stock -= quantity;
     }
@@ -241,7 +242,7 @@ public class Product extends Auditable {
 
     public void updateStock(Integer newStock) {
         if (newStock == null || newStock < 0) {
-            throw new IllegalStateException("Stock cannot be negative");
+            throw new BusinessRuleException("Stock cannot be negative");
         }
 
         this.stock = newStock;
@@ -249,7 +250,7 @@ public class Product extends Auditable {
 
     public void adjust(Integer delta) {
         if (delta == null || (stock + delta) < 0) {
-            throw new IllegalStateException("Stock cannot be negative");
+            throw new BusinessRuleException("Stock cannot be negative");
         }
 
         this.stock += delta;
@@ -261,7 +262,7 @@ public class Product extends Auditable {
 
     public void updatePrice(BigDecimal newPrice) {
         if (newPrice.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalStateException("Price must be positive");
+            throw new BusinessRuleException("Price must be positive");
         }
         this.price = newPrice;
     }
@@ -383,10 +384,10 @@ public class Product extends Auditable {
 
         public Product build() {
             if (stock < 0) {
-                throw new IllegalStateException("Stock cannot be negative");
+                throw new BusinessRuleException("Stock cannot be negative");
             }
             if (lowStockThreshold < 0) {
-                throw new IllegalStateException("Low stock threshold cannot be negative");
+                throw new BusinessRuleException("Low stock threshold cannot be negative");
             }
             return new Product(this);
         }

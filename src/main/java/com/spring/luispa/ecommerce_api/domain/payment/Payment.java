@@ -247,11 +247,11 @@ public class Payment extends Auditable {
     }
 
     public void refund(String reason) {
-        if (status != PaymentStatus.COMPLETED) {
-            throw new IllegalStateException("Only completed payments can be refunded");
+        if (!isRefundable()) {
+            throw new IllegalStateException(String.format("Payment cannot be refunded. Status; %s", status));
         }
 
-        if (refundAmount != null && refundAmount.compareTo(BigDecimal.ZERO) >= 0) {
+        if (refundAmount != null && refundAmount.compareTo(amount) >= 0) {
             throw new IllegalStateException("Payment already fulled refunded");
         }
 
@@ -270,8 +270,8 @@ public class Payment extends Auditable {
     }
 
     public void partialRefund(BigDecimal refundAmount, String reason) {
-        if (status != PaymentStatus.COMPLETED) {
-            throw new IllegalStateException("Only completed payments can be refunded");
+        if (!isRefundable()) {
+            throw new IllegalStateException(String.format("Payment cannot be refunded. Status; %s", status));
         }
 
         if (refundAmount.compareTo(BigDecimal.ZERO) <= 0) {
@@ -289,6 +289,12 @@ public class Payment extends Auditable {
                 reason,
                 RefundType.PARTIAL
         );
+
+        refundTransactions.add(refund);
+        this.refundAmount = totalRefunded.add(refundAmount);
+        this.status = PaymentStatus.PARTIALLY_REFUNDED;
+        this.refundedAt = LocalDateTime.now();
+        this.refundReason = reason;
     }
 
     private BigDecimal calculateTotalRefunded() {
@@ -298,8 +304,7 @@ public class Payment extends Auditable {
     }
 
     public boolean isRefundable() {
-        return status == PaymentStatus.COMPLETED &&
-                (refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) < 0);
+        return status == PaymentStatus.COMPLETED;
     }
 
     public BigDecimal getPendingAmount() {

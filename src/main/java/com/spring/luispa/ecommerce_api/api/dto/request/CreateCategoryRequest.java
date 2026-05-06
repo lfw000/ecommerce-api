@@ -19,11 +19,13 @@ public class CreateCategoryRequest {
     @Size(max = 200)
     private String description;
 
-    @Schema(description = "Parent category ID",
+    @Schema(description = "Parent category ID (null for root category)",
         example = "null")
     private Long parentId;
 
-    @Schema(description = "Display order", example = "1")
+    @Schema(description = "Display order",
+            example = "1",
+            defaultValue = "0")
     private Integer displayOrder;
 
     public String getName() {

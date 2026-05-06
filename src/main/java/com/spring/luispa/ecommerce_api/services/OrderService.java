@@ -1,6 +1,7 @@
 package com.spring.luispa.ecommerce_api.services;
 
 
+import com.spring.luispa.ecommerce_api.api.dto.request.CancelOrderRequest;
 import com.spring.luispa.ecommerce_api.api.dto.request.CreateOrderRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.OrderResponse;
 import com.spring.luispa.ecommerce_api.domain.cart.Cart;
@@ -18,8 +19,7 @@ import com.spring.luispa.ecommerce_api.domain.user.User;
 import com.spring.luispa.ecommerce_api.domain.user.UserRepository;
 import com.spring.luispa.ecommerce_api.mappers.OrderMapper;
 import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
-import com.spring.luispa.ecommerce_api.shared.enums.PaymentStatus;
-import com.spring.luispa.ecommerce_api.shared.exception.BusinessException;
+import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import com.spring.luispa.ecommerce_api.shared.exception.UnauthorizedException;
 import org.springframework.data.domain.Pageable;
@@ -140,10 +140,10 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         Cart cart = cartRepository.findCartForCheckout(userId)
-                .orElseThrow(() -> new BusinessException("No active cart found for user"));
+                .orElseThrow(() -> new BusinessRuleException("No active cart found for user"));
 
         if (cart.getItems().isEmpty()) {
-            throw new BusinessException("Cannot create order from empty cart");
+            throw new BusinessRuleException("Cannot create order from empty cart");
         }
 
         validateStock(cart);
@@ -220,26 +220,15 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderResponse cancelOrder(Long orderId, Long userId, String reason) {
+    public OrderResponse cancelOrder(Long orderId, CancelOrderRequest request, Long userId, String userRole ) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
 
-        if (!order.getUser().getId().equals(userId)) {
+        if (!"ADMIN".equals(userRole) && !order.getUser().getId().equals(userId)) {
             throw new UnauthorizedException("Order does not belong to user");
         }
 
-        if (!order.isCancellable()) {
-            throw new BusinessException("Order cannot be cancelled in current status: " + order.getStatus());
-        }
-
-        order.cancel(reason);
-
-        if (order.getPayment() != null && order.getPayment().getStatus() == PaymentStatus.COMPLETED) {
-            order.getPayment().refund(reason);
-            paymentRepository.save(order.getPayment());
-        }
-
-        restoreStock(order);
+        order.cancel(request, userId, userRole);
 
         return orderMapper.toResponse(order);
     }
@@ -250,7 +239,7 @@ public class OrderService {
         for (CartItem item : cart.getItems()) {
             Product product = item.getProduct();
             if (!product.hasStock(item.getQuantity())) {
-                throw new BusinessException(String.format("Insufficient stock for product: %s. Available. %d, Requested: %d",
+                throw new BusinessRuleException(String.format("Insufficient stock for product: %s. Available. %d, Requested: %d",
                         product.getSku(),
                         product.getStock(),
                         item.getQuantity()));
@@ -278,7 +267,7 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Address not found with id: " + addressId));
 
         if (!address.getUser().getId().equals(userId)) {
-            throw new BusinessException("Address does not belong to the user");
+            throw new BusinessRuleException("Address does not belong to the user");
         }
 
         return address;

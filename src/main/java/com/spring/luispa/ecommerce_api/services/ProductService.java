@@ -5,7 +5,8 @@ import com.spring.luispa.ecommerce_api.api.dto.request.UpdateProductRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.ProductResponse;
 import com.spring.luispa.ecommerce_api.domain.product.*;
 import com.spring.luispa.ecommerce_api.mappers.ProductMapper;
-import com.spring.luispa.ecommerce_api.shared.exception.BusinessException;
+import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
+import com.spring.luispa.ecommerce_api.shared.exception.DuplicateResourceException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import com.spring.luispa.ecommerce_api.shared.security.SecurityUtils;
 import org.springframework.data.domain.Page;
@@ -45,11 +46,9 @@ public class ProductService {
         if (isAdmin) {
             product = productRepository.findWithCategoryAndImagesById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-
         } else {
             product = productRepository.findActiveWithCategoryAndImagesById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-
         }
         return productMapper.toResponse(product);
     }
@@ -159,7 +158,7 @@ public class ProductService {
     @Transactional
     public ProductResponse createProduct(CreateProductRequest request) {
         if (productRepository.existsBySku(request.getSku())) {
-            throw new BusinessException("Product already exists with SKU: " + request.getSku());
+            throw new DuplicateResourceException("Product already exists with SKU: " + request.getSku());
         }
 
         Category category = categoryRepository.findById(request.getCategoryId())
@@ -168,7 +167,6 @@ public class ProductService {
         Product product = productMapper.toEntity(request);
         product.setCategory(category);
 
-        // Convert attributes map to ProductAttributes
         if (request.getAttributes() != null && !request.getAttributes().isEmpty()) {
             ProductAttributes productAttributes = new ProductAttributes();
             productAttributes.putAll(request.getAttributes());

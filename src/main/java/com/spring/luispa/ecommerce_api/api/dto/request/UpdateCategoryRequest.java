@@ -3,21 +3,25 @@ package com.spring.luispa.ecommerce_api.api.dto.request;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 
-@Schema(description = "Request to update a category")
+@Schema(description = "Request to update an existing category")
 public class UpdateCategoryRequest {
 
-    @Schema(description = "Category name", example = "Electronics")
+    @Schema(description = "New category name",
+            example = "Electronics")
     @Size(max = 50)
     private String name;
 
-    @Schema(description = "Category description", example = "Electronic products and gadgets")
+    @Schema(description = "New category description",
+            example = "Electronic products and gadgets")
     @Size(max = 200)
     private String description;
 
-    @Schema(description = "Display order", example = "1")
+    @Schema(description = "New display order",
+            example = "1")
     private Integer displayOrder;
 
-    @Schema(description = "Whether the category is active", example = "true")
+    @Schema(description = "Whether the category is active",
+            example = "true")
     private Boolean active;
 
     public String getName() {

@@ -6,43 +6,43 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-@Schema(description = "Request to add a new address")
+@Schema(description = "Request object to add a new address")
 public class AddAddressRequest {
 
-    @Schema(description = "Street and number",
-        example = "123 Some Street",
-        requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @Schema(description = "Street name and number",
+        example = "Av. Skull 123",
+        requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "Street is required")
     @Size(max = 100)
     private String street;
 
-    @Schema(description = "Address details (building, floor, etc.)",
+    @Schema(description = "Additional address information (apartment, floor, etc.)",
         example = "5th Floor, Office 105")
     @Size(max = 100)
     private String addressLine2;
 
-    @Schema(description = "City",
-        example = "Boston",
+    @Schema(description = "City name",
+        example = "Miami",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "City is required")
-    @Size(max = 100)
+    @Size(max = 50)
     private String city;
 
     @Schema(description = "State or province",
-        example = "Massachusetts",
+        example = "Florida",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "State is required")
     @Size(max = 50)
     private String state;
 
-    @Schema(description = "Zip code",
+    @Schema(description = "Postal/Zip code",
         example = "06500",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "Zip code is required")
     @Size(max = 10)
     private String zipCode;
 
-    @Schema(description = "Country",
+    @Schema(description = "Country name",
         example = "United States",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "Country is required")
@@ -61,8 +61,9 @@ public class AddAddressRequest {
     @NotNull(message = "Address type is required")
     private AddressType addressType;
 
-    @Schema(description = "Special instructions for the delivery person",
+    @Schema(description = "Special delivery instructions",
         example = "Leave with the doorman")
+    @Size(max = 500)
     private String deliveryInstruction;
 
     public String getStreet() {

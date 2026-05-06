@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
-@Schema(description = "Product update request")
+@Schema(description = "Request to update an existing product")
 public class UpdateProductRequest {
 
     @Schema(description = "New product name",
@@ -24,20 +24,20 @@ public class UpdateProductRequest {
     @Positive
     private BigDecimal price;
 
-    @Schema(description = "New stock",
+    @Schema(description = "New stock quantity",
             example = "25")
-    @PositiveOrZero
+    @PositiveOrZero(message = "Stock cannot be negative")
     private Integer stock;
 
     @Schema(description = "New category ID",
         example = "2")
     private Long categoryId;
 
-    @Schema(description = "Enable/disable product",
+    @Schema(description = "Whether the product is active",
         example = "true")
     private Boolean active;
 
-    @Schema(description = "Mark as featured",
+    @Schema(description = "Whether the product is featured",
             example = "true")
     private Boolean featured;
 

@@ -4,10 +4,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
-@Schema(description = "Request to add a product to the cart")
+@Schema(description = "Request to add a product to the shopping cart")
 public class AddToCartRequest {
 
-    @Schema(description = "Product ID",
+    @Schema(description = "ID of the product to add",
         example = "1",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "Product ID is required")

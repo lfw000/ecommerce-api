@@ -1,9 +1,11 @@
 package com.spring.luispa.ecommerce_api.domain.order;
 
+import com.spring.luispa.ecommerce_api.api.dto.request.CancelOrderRequest;
 import com.spring.luispa.ecommerce_api.domain.user.Address;
 import com.spring.luispa.ecommerce_api.domain.user.User;
 import com.spring.luispa.ecommerce_api.shared.common.Auditable;
 import com.spring.luispa.ecommerce_api.domain.payment.Payment;
+import com.spring.luispa.ecommerce_api.shared.enums.CancellationReason;
 import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -12,6 +14,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -88,9 +91,24 @@ public class Order extends Auditable {
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 
-    @Size(max = 50)
-    @Column(name = "cancellation_reason", length = 500)
-    private String cancellationReason;
+    @Column(name = "cancelled_by")
+    private Long cancelledBy;
+
+    @Column(name = "cancelled_by_role")
+    private String cancelledByRole;
+
+    @Column(name = "cancellation_comment")
+    private String cancellationComment;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancellation_reason", length = 30)
+    private CancellationReason cancellationReason;
+
+    @Column(name = "processed_at")
+    private LocalDateTime processedAt;
+
+    @Column(name = "refunded_at")
+    private LocalDateTime refundedAt;
 
     @Size(max = 1000)
     @Column(length = 1000)
@@ -98,6 +116,12 @@ public class Order extends Auditable {
 
     @OneToOne(mappedBy = "order", cascade =  {CascadeType.PERSIST, CascadeType.MERGE})
     private Payment payment;
+
+    @Column(name = "payment_transaction_id")
+    private String paymentTransactionId;
+
+    @Column(name = "shipped_at")
+    private LocalDateTime shippedAt;
 
     protected Order() {
         // No-args constructor
@@ -252,11 +276,11 @@ public class Order extends Auditable {
         this.cancelledAt = cancelledAt;
     }
 
-    public String getCancellationReason() {
+    public CancellationReason getCancellationReason() {
         return cancellationReason;
     }
 
-    public void setCancellationReason(String cancellationReason) {
+    public void setCancellationReason(CancellationReason cancellationReason) {
         this.cancellationReason = cancellationReason;
     }
 
@@ -276,41 +300,134 @@ public class Order extends Auditable {
         this.payment = payment;
     }
 
+    public Long getCancelledBy() {
+        return cancelledBy;
+    }
+
+    public void setCancelledBy(Long cancelledBy) {
+        this.cancelledBy = cancelledBy;
+    }
+
+    public String getCancelledByRole() {
+        return cancelledByRole;
+    }
+
+    public void setCancelledByRole(String cancelledByRole) {
+        this.cancelledByRole = cancelledByRole;
+    }
+
+    public String getCancellationComment() {
+        return cancellationComment;
+    }
+
+    public void setCancellationComment(String cancellationComment) {
+        this.cancellationComment = cancellationComment;
+    }
+
+    public LocalDateTime getProcessedAt() {
+        return processedAt;
+    }
+
+    public void setProcessedAt(LocalDateTime processedAt) {
+        this.processedAt = processedAt;
+    }
+
+    public LocalDateTime getRefundedAt() {
+        return refundedAt;
+    }
+
+    public void setRefundedAt(LocalDateTime refundedAt) {
+        this.refundedAt = refundedAt;
+    }
+
+    public String getPaymentTransactionId() {
+        return paymentTransactionId;
+    }
+
+    public void setPaymentTransactionId(String paymentTransactionId) {
+        this.paymentTransactionId = paymentTransactionId;
+    }
+
+    public LocalDateTime getShippedAt() {
+        return shippedAt;
+    }
+
+    public void setShippedAt(LocalDateTime shippedAt) {
+        this.shippedAt = shippedAt;
+    }
+
     // Domain methods
 
     public void confirmPayment(String transactionId) {
         if (status != OrderStatus.PENDING) {
-            throw new IllegalStateException("Only pending orders can be confirmed");
+            throw new IllegalStateException(String.format("Cannot confirm payment. Current status: %s", status));
         }
-        status = OrderStatus.PAID;
+        this.status = OrderStatus.PAID;
+        this.paymentTransactionId = transactionId;
+    }
+
+    public void startProcessing() {
+        if (status != OrderStatus.PAID) {
+            throw new IllegalStateException(String.format("Cannot start processing. Current status: %s", status));
+        }
+        this.status = OrderStatus.PROCESSING;
+        this.processedAt = LocalDateTime.now();
     }
 
     public void ship(String trackingNumber) {
-        if (status != OrderStatus.PAID) {
-            throw new IllegalStateException("Only paid orders can be shipped");
+        if (status != OrderStatus.PROCESSING) {
+            throw new IllegalStateException(String.format("Cannot ship. Current status: %s", status));
         }
         status = OrderStatus.SHIPPED;
         this.trackingNumber = trackingNumber;
+        this.shippedAt = LocalDateTime.now();
     }
 
     public void deliver() {
         if (status != OrderStatus.SHIPPED) {
-            throw new IllegalStateException("Only shipped orders  can be delivered");
+            throw new IllegalStateException(String.format("Cannot deliver. Current status: %s", status));
         }
         status = OrderStatus.DELIVERED;
         deliveredAt = LocalDateTime.now();
     }
 
-    public void cancel(String reason) {
-        if (status == OrderStatus.DELIVERED) {
-            throw new IllegalStateException("Delivery orders cannot be cancelled");
+    public void cancel(CancelOrderRequest request, Long userId, String userRole) {
+        if (status == OrderStatus.SHIPPED || status == OrderStatus.DELIVERED) {
+            throw new IllegalStateException(String.format("Cannot cancel order. Current status: %s", status));
         }
-        if (status == OrderStatus.CANCELLED) {
-            throw new IllegalStateException("Order is already cancelled");
+
+        if (status== OrderStatus.CANCELLED || status == OrderStatus.DELIVERED) {
+            throw new IllegalStateException("Order is already cancelled or refunded");
         }
-        status = OrderStatus.CANCELLED;
-        cancelledAt = LocalDateTime.now();
-        cancellationReason = reason;
+
+        if ((status == OrderStatus.PAID || status == OrderStatus.PROCESSING) && !isWithinCancellationWindow()) {
+            throw new IllegalStateException(String.format("Cencellation window has expired (30 minutes after order)"));
+        }
+
+        this.cancelledBy = userId;
+        this.cancelledByRole = userRole;
+        this.cancellationReason = request.getReason();
+        this.cancellationComment = request.getComment();
+        this.status = OrderStatus.CANCELLED;
+
+        if (payment != null && payment.getStatus().isSuccessful()) {
+            payment.refund(request.getReason().getDescription());
+            this.refundedAt = LocalDateTime.now();
+        }
+    }
+
+    public void markAsRefunded() {
+        if (status != OrderStatus.CANCELLED) {
+            throw new IllegalStateException(String.format("Only cancelled orders can be marked as refunded. Current status: %s", status));
+        }
+
+        this.status = OrderStatus.REFUNDED;
+        this.refundedAt = LocalDateTime.now();
+    }
+
+    private boolean isWithinCancellationWindow() {
+        Duration timeSinceCreation = Duration.between(getCreatedAt(), LocalDateTime.now());
+        return timeSinceCreation.toMinutes() <= 30;
     }
 
     public boolean isCancellable() {

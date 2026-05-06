@@ -2,31 +2,39 @@ package com.spring.luispa.ecommerce_api.api.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
-@Schema(description = "Category response")
+@Schema(description = "Category information response")
 public class CategoryResponse {
 
-    @Schema(description = "Category ID", example = "1")
+    @Schema(description = "Category ID",
+            example = "1")
     private Long id;
 
-    @Schema(description = "Category name", example = "Electrónicos")
+    @Schema(description = "Category name",
+            example = "Electronics")
     private String name;
 
-    @Schema(description = "Category description", example = "Electronic products and gadgets")
+    @Schema(description = "Category description",
+            example = "Electronic products and gadgets")
     private String description;
 
-    @Schema(description = "Whether the category is active", example = "true")
+    @Schema(description = "Whether the category is active",
+            example = "true")
     private boolean active;
 
-    @Schema(description = "Parent category ID", example = "null")
+    @Schema(description = "Parent category ID",
+            example = "null")
     private Long parentCategoryId;
 
-    @Schema(description = "Parent category name", example = "null")
+    @Schema(description = "Parent category name",
+            example = "null")
     private String parentCategoryName;
 
-    @Schema(description = "Display order", example = "1")
+    @Schema(description = "Display order",
+            example = "1")
     private Integer displayOrder;
 
-    @Schema(description = "Full category path", example = "Electrónicos > Computadoras > Laptops")
+    @Schema(description = "Full category path",
+            example = "Electronics > Computers > Laptops")
     private String fullPath;
 
     public Long getId() {
