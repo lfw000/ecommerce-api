@@ -141,7 +141,7 @@ public class GlobalExceptionHandler {
         ErrorResponse error = new ErrorResponse(
                 HttpStatus.BAD_REQUEST.value(),
                 "Validation Failed",
-                "TYPE_MISMATCH",
+                "VALIDATION_ERROR",
                 "Invalid input data",
                 request.getRequestURI(),
                 validationErrors

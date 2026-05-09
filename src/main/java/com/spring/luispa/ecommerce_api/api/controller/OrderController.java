@@ -45,7 +45,7 @@ public class OrderController {
     })
     public ResponseEntity<OrderResponse> createOrder(@CurrentUser UserDetailsImpl currentUser,
                                                      @Valid @RequestBody CreateOrderRequest request) {
-        return ResponseEntity.status(HttpStatus.OK).body(orderService.createOrderFromCart(currentUser.getId(), request));
+        return ResponseEntity.status(HttpStatus.CREATED ).body(orderService.createOrderFromCart(currentUser.getId(), request));
     }
 
     @GetMapping

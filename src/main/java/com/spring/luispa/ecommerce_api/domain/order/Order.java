@@ -7,6 +7,9 @@ import com.spring.luispa.ecommerce_api.shared.common.Auditable;
 import com.spring.luispa.ecommerce_api.domain.payment.Payment;
 import com.spring.luispa.ecommerce_api.shared.enums.CancellationReason;
 import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
+import com.spring.luispa.ecommerce_api.shared.exception.OrderAlreadyCancelledException;
+import com.spring.luispa.ecommerce_api.shared.exception.OrderCancellationNotAllowedException;
+import com.spring.luispa.ecommerce_api.shared.exception.OrderCancellationWindowExpiredException;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -393,15 +396,15 @@ public class Order extends Auditable {
 
     public void cancel(CancelOrderRequest request, Long userId, String userRole) {
         if (status == OrderStatus.SHIPPED || status == OrderStatus.DELIVERED) {
-            throw new IllegalStateException(String.format("Cannot cancel order. Current status: %s", status));
+            throw new OrderCancellationNotAllowedException(String.format("Cannot cancel order. Current status: %s", status));
         }
 
         if (status== OrderStatus.CANCELLED || status == OrderStatus.DELIVERED) {
-            throw new IllegalStateException("Order is already cancelled or refunded");
+            throw new OrderAlreadyCancelledException("Order is already cancelled or refunded");
         }
 
         if ((status == OrderStatus.PAID || status == OrderStatus.PROCESSING) && !isWithinCancellationWindow()) {
-            throw new IllegalStateException(String.format("Cencellation window has expired (30 minutes after order)"));
+            throw new OrderCancellationWindowExpiredException(String.format("Cancellation window has expired (30 minutes after order)"));
         }
 
         this.cancelledBy = userId;

@@ -61,8 +61,8 @@ public class CartService {
             throw new InsufficientStockException(
                     product.getId(),
                     product.getSku(),
-                    product.getStock(),
-                    request.getQuantity());
+                    request.getQuantity(),
+                    product.getStock());
         }
 
         Cart cart = getOrCreateActiveCartWithItems(userId);
