@@ -5,7 +5,7 @@ public class OrderCancellationWindowExpiredException extends DomainException {
     public OrderCancellationWindowExpiredException() {
         super(
                 "Cancellation window has expired",
-                "DOMAIN_ORDER_CANCELLATION_WINDOW_EXPIRED",
+                "ORDER_CANCELLATION_WINDOW_EXPIRED",
                 409
         );
     }
@@ -13,7 +13,7 @@ public class OrderCancellationWindowExpiredException extends DomainException {
     public OrderCancellationWindowExpiredException(String message) {
         super(
                 message,
-                "DOMAIN_ORDER_CANCELLATION_WINDOW_EXPIRED",
+                "ORDER_CANCELLATION_WINDOW_EXPIRED",
                 409
         );
     }
