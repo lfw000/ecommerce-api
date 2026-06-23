@@ -1,8 +1,10 @@
 package com.spring.luispa.ecommerce_api.api.controller;
 
 import com.spring.luispa.ecommerce_api.api.dto.request.LoginRequest;
+import com.spring.luispa.ecommerce_api.api.dto.request.RefreshTokenRequest;
 import com.spring.luispa.ecommerce_api.api.dto.request.RegisterRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.JwtResponse;
+import com.spring.luispa.ecommerce_api.api.dto.response.RefreshTokenResponse;
 import com.spring.luispa.ecommerce_api.api.dto.response.UserResponse;
 import com.spring.luispa.ecommerce_api.security.JwtUtils;
 import com.spring.luispa.ecommerce_api.services.AuthService;
@@ -13,14 +15,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -40,20 +40,6 @@ public class AuthController {
         this.jwtUtils = jwtUtils;
     }
 
-    @PostMapping("/login")
-    @Operation(summary = "Authenticate user", description = "Login with email and password")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Login successful",
-                    content = @Content(schema = @Schema(implementation = JwtResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request data"),
-            @ApiResponse(responseCode = "401", description = "Invalid email or password")
-    })
-    public ResponseEntity<JwtResponse> authenticateUser(@Valid @RequestBody LoginRequest request) {
-        JwtResponse jwtResponse = authService.authenticate(request);
-
-        return ResponseEntity.status(HttpStatus.OK).body(jwtResponse);
-    }
-
     @PostMapping("/register")
     @Operation(summary = "Register new user", description = "Create a new user account")
     @ApiResponses(value = {
@@ -65,5 +51,48 @@ public class AuthController {
         UserResponse response = userService.register(request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/login")
+    @Operation(summary = "Authenticate user", description = "Login with email and password")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Login successful",
+                    content = @Content(schema = @Schema(implementation = JwtResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid request data"),
+            @ApiResponse(responseCode = "401", description = "Invalid email or password")
+    })
+    public ResponseEntity<JwtResponse> authenticateUser(@Valid @RequestBody LoginRequest request,
+                                                        HttpServletRequest httRequest) {
+
+        String clientIp = httRequest.getRemoteAddr();
+
+        JwtResponse response = authService.authenticate(request, clientIp);
+
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh access token")
+    public ResponseEntity<RefreshTokenResponse> refreshToken(
+            @Valid @RequestBody RefreshTokenRequest request,
+            HttpServletRequest httRequest) {
+
+        String clientIp = httRequest.getRemoteAddr();
+
+        RefreshTokenResponse response = authService.refreshToken(request, clientIp);
+
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Logout user")
+    public ResponseEntity<Void> logout(@RequestHeader(value = "Refresh-Token", required = false) String refreshToken,
+                                       HttpServletRequest httRequest) {
+
+        String clientIp = httRequest.getRemoteAddr();
+
+        authService.logout(refreshToken, clientIp);
+
+        return ResponseEntity.status(HttpStatus.OK).build();
     }
 }

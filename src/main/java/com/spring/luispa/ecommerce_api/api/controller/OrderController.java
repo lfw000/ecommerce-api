@@ -104,7 +104,7 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
-    // Administrator methods
+    // Administrator endpoints
 
     @GetMapping("/admin/all")
     @PreAuthorize("hasRole('ADMIN')")

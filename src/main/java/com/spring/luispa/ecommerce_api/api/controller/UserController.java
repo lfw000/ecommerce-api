@@ -44,8 +44,9 @@ public class UserController {
                     content = @Content(schema = @Schema(implementation = UserResponse.class))),
             @ApiResponse(responseCode = "401", description = "Not authenticated")
     })
-    public ResponseEntity<UserResponse> getCurrentUser(UserDetailsImpl currentUser) {
-        return ResponseEntity.status(HttpStatus.OK).body(userService.findById(currentUser.getId()));
+    public ResponseEntity<UserResponse> getCurrentUser(
+            @CurrentUser UserDetailsImpl currentUser) {
+        return ResponseEntity.status(HttpStatus.OK).body(userService.findByEmail(currentUser.getEmail()));
      }
 
     @PutMapping("/me")

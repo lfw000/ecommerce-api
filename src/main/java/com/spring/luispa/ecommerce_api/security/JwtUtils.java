@@ -27,6 +27,9 @@ public class JwtUtils {
     @Value("${app.jwt.expiration-ms}")
     private int jwtExpirationMs;
 
+    @Value("${app.jwt.refresh-expiration-ms}")
+    private int refreshExpirationMs;
+
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
@@ -34,15 +37,28 @@ public class JwtUtils {
     public String generateJwtToken(Authentication authentication) {
         UserDetailsImpl userPrincipal = (UserDetailsImpl) authentication.getPrincipal();
 
+        return generateTokenFromEmail(userPrincipal.getEmail());
+    }
+
+    public String generateTokenFromEmail(String email) {
         return Jwts.builder()
-                .subject(userPrincipal.getEmail())
+                .subject(email)
                 .issuedAt(new Date())
-                .expiration(new Date((new Date()).getTime() + jwtExpirationMs))
+                .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS512)
                 .compact();
     }
 
-    public String getEmailFromJwtToken(String token) {
+    public String generateRefreshToken(String email) {
+        return Jwts.builder()
+                .subject(email)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + refreshExpirationMs))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS512)
+                .compact();
+    }
+
+    public String getEmailFromToken(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
@@ -62,7 +78,7 @@ public class JwtUtils {
                     .build()
                     .parseClaimsJws(authToken);
 
-            Claims claims = claimsJws.getBody();
+            Claims claims = claimsJws.getPayload();
 
             Date expiration = claims.getExpiration();
             if (expiration == null) {
@@ -101,7 +117,7 @@ public class JwtUtils {
         validateJwtToken(authToken);
 
         try {
-            String email = getEmailFromJwtToken(authToken);
+            String email = getEmailFromToken(authToken);
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
             if (!userDetails.isEnabled()) {
@@ -118,5 +134,9 @@ public class JwtUtils {
         } catch (UsernameNotFoundException e) {
             throw new UserNotFoundException();
         }
+    }
+
+    public int getJwtExpirationMs() {
+        return jwtExpirationMs;
     }
 }

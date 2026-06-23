@@ -54,7 +54,8 @@ server:
 app:
   jwt:
     secret: ${JWT_SECRET:AOrfMg84iIUfLt8dop5VE2exjcAPdAAGDW6myepzOE99YvtjzKdfRZMU3Lltzw2XLbem6NiNFMJLtPCZm2y6Qm}
-    expiration-ms: ${JWT_EXPIRATION:86400}}
+    expiration-ms: ${JWT_EXPIRATION:900000}}
+    refresh-expiration-ms: 604800000
 
 # LOGGING
 logging:

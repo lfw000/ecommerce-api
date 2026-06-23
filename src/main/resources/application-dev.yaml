@@ -55,7 +55,7 @@ cors:
 
 app:
   jwt:
-    expiration-ms: 604800000
+    expiration-ms: 900000
 
 springdoc:
   api-docs:

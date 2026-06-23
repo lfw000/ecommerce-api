@@ -16,6 +16,9 @@ public class JwtResponse {
         example = "Bearer")
     private String type = "Bearer";
 
+    @Schema(description = "Refresh token")
+    private String refreshToken;
+
     @Schema(description = "User ID",
             example = "1")
     private Long id;
@@ -38,8 +41,9 @@ public class JwtResponse {
     @Schema(description = "Token expiration date", example = "2024-12-05T10:00:00")
     private LocalDateTime expiresAt;
 
-    public JwtResponse(String token, UserResponse user) {
+    public JwtResponse(String token, String refreshToken, UserResponse user) {
         this.token = token;
+        this.refreshToken = refreshToken;
         this.id = user.getId();
         this.email = user.getEmail();
         this.firstName = user.getFirstName();
@@ -47,16 +51,8 @@ public class JwtResponse {
         this.roles = user.getRoles();
     }
 
-    public JwtResponse(String token, UserResponse user, LocalDateTime expiresAt) {
-        this(token, user);
-        this.expiresAt = expiresAt;
-    }
-
-    public JwtResponse(String token, Long id, String email, java.util.Set<String> roles) {
-        this.token = token;
-        this.id = id;
-        this.email = email;
-        this.roles = roles;
+    public JwtResponse(String token, UserResponse user) {
+        this(token, null, user);
     }
 
     public String getToken() {
@@ -73,6 +69,14 @@ public class JwtResponse {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
     }
 
     public Long getId() {

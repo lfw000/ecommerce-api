@@ -121,9 +121,4 @@ public class PaymentController {
             @Valid @RequestBody RefundRequest request) {
         return ResponseEntity.ok(paymentService.partialRefundPayment(id, request));
     }
-
-    //@GetMapping("/user")
-    //public ResponseEntity<List<PaymentResponse>> getUserPayments(@CurrentUser UserDetailsImpl currentUser) {
-    //    return ResponseEntity.status(HttpStatus.OK).body(paymentService.findPaymentsByUserId(currentUser.getId()));
-    //}
 }

@@ -64,7 +64,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (jwt != null) {
                 jwtUtils.validateJwtTokenWithUser(jwt, userDetailsService);
 
-                String email = jwtUtils.getEmailFromJwtToken(jwt);
+                String email = jwtUtils.getEmailFromToken(jwt);
                 UserDetails userDetails;
 
                 try {
