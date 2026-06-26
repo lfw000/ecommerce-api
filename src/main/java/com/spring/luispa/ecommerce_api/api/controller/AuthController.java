@@ -6,6 +6,8 @@ import com.spring.luispa.ecommerce_api.api.dto.request.RegisterRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.JwtResponse;
 import com.spring.luispa.ecommerce_api.api.dto.response.RefreshTokenResponse;
 import com.spring.luispa.ecommerce_api.api.dto.response.UserResponse;
+import com.spring.luispa.ecommerce_api.infrastructure.ratelimit.RateLimitType;
+import com.spring.luispa.ecommerce_api.infrastructure.ratelimit.RateLimited;
 import com.spring.luispa.ecommerce_api.security.JwtUtils;
 import com.spring.luispa.ecommerce_api.services.AuthService;
 import com.spring.luispa.ecommerce_api.services.UserService;
@@ -41,6 +43,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
+    @RateLimited(type = RateLimitType.REGISTER)
     @Operation(summary = "Register new user", description = "Create a new user account")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "User registered successfully",
@@ -54,6 +57,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @RateLimited(type = RateLimitType.LOGIN)
     @Operation(summary = "Authenticate user", description = "Login with email and password")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Login successful",
@@ -72,6 +76,7 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
+    @RateLimited(type = RateLimitType.GENERAL)
     @Operation(summary = "Refresh access token")
     public ResponseEntity<RefreshTokenResponse> refreshToken(
             @Valid @RequestBody RefreshTokenRequest request,

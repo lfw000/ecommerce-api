@@ -1,5 +1,11 @@
 package com.spring.luispa.ecommerce_api.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.util.StdDateFormat;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.spring.luispa.ecommerce_api.api.dto.response.ErrorResponse;
+import com.spring.luispa.ecommerce_api.shared.exception.*;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,10 +29,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
+    private final ObjectMapper objectMapper;
 
     public JwtAuthenticationFilter(JwtUtils jwtUtils, UserDetailsService userDetailsService) {
         this.jwtUtils = jwtUtils;
         this.userDetailsService = userDetailsService;
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.registerModule(new JavaTimeModule());
+        this.objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+        this.objectMapper.setDateFormat(new StdDateFormat());
     }
 
     private String parseJwt(HttpServletRequest request) {
@@ -47,6 +58,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return null;
     }
 
+    private void sendErrorResponse(HttpServletResponse response, int status, String errorCode, String message) throws IOException {
+        ErrorResponse errorResponse = new ErrorResponse(
+                status,
+                getHttpStatusName(status),
+                errorCode,
+                message,
+                null
+        );
+
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(objectMapper.writeValueAsString(errorResponse));
+    }
+
+    private String getHttpStatusName(int status) {
+        switch (status) {
+            case 400: return "Bad Request";
+            case 401: return "Unauthorized";
+            case 403: return "Forbidden";
+            case 404: return "Not Found";
+            case 429: return "Too Many Requests";
+            case 500: return "Internal Server Error";
+            default: return "Error";
+        }
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -62,7 +100,57 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = parseJwt(request);
 
             if (jwt != null) {
-                jwtUtils.validateJwtTokenWithUser(jwt, userDetailsService);
+                try {
+                    jwtUtils.validateJwtTokenWithUser(jwt, userDetailsService);
+                } catch (JwtExpiredException ex) {
+                    logger.warn("JWT token expired: {}", ex.getMessage());
+                    sendErrorResponse(
+                            response,
+                            401,
+                            "JWT_EXPIRED",
+                            "Your session has expired. Please refresh your token.");
+                    return;
+                } catch (JwtMalformedException ex) {
+                    logger.warn("JWT token malformed: {}", ex.getMessage());
+                    sendErrorResponse(
+                            response,
+                            400,
+                            "JWT_MALFORMED",
+                            "Invalid token format");
+                    return;
+                } catch (JwtUnsupportedException ex) {
+                    logger.warn("JWT token unsupported: {}", ex.getMessage());
+                    sendErrorResponse(
+                            response,
+                            400,
+                            "JWT_UNSUPPORTED",
+                            "Unsupported token format");
+                    return;
+                } catch (UserDisabledException ex) {
+                    logger.warn("User is disabled: {}", ex.getMessage());
+                    sendErrorResponse(
+                            response,
+                            403,
+                            "USER_DISABLED",
+                            "Your account has been disabled");
+                    return;
+                } catch (UserLockedException ex) {
+                    logger.warn("User account is locked: {}", ex.getMessage());
+                    sendErrorResponse(
+                            response,
+                            403,
+                            "USER_LOCKED",
+                            "Your account has been locked");
+                    return;
+                } catch (UserNotFoundException ex) {
+                    logger.warn("User not found: {}", ex.getMessage());
+                    sendErrorResponse(
+                            response,
+                            401,
+                            "USER_NOT_FOUND",
+                            "User not found");
+                    return;
+                }
 
                 String email = jwtUtils.getEmailFromToken(jwt);
                 UserDetails userDetails;
@@ -73,20 +161,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     logger.warn("User not found for JWT token: {}", email);
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.getWriter().write("User not found");
-                    return;
-                }
-
-                if (!userDetails.isEnabled()) {
-                    logger.warn("User is disabled: {}", email);
-                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.getWriter().write("User account is disabled");
-                    return;
-                }
-
-                if (!userDetails.isAccountNonLocked()) {
-                    logger.warn("User account is locked: {}", email);
-                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.getWriter().write("User account is locked");
                     return;
                 }
 

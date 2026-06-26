@@ -3,6 +3,8 @@ package com.spring.luispa.ecommerce_api.api.controller;
 import com.spring.luispa.ecommerce_api.api.dto.request.CancelOrderRequest;
 import com.spring.luispa.ecommerce_api.api.dto.request.CreateOrderRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.OrderResponse;
+import com.spring.luispa.ecommerce_api.infrastructure.ratelimit.RateLimitType;
+import com.spring.luispa.ecommerce_api.infrastructure.ratelimit.RateLimited;
 import com.spring.luispa.ecommerce_api.security.CurrentUser;
 import com.spring.luispa.ecommerce_api.security.UserDetailsImpl;
 import com.spring.luispa.ecommerce_api.services.OrderService;
@@ -36,6 +38,7 @@ public class OrderController {
     }
 
     @PostMapping
+    @RateLimited(type = RateLimitType.ORDER_CREATION)
     @Operation(summary = "Create order", description = "Creates an order from the user's active shopping cart")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Order successfully created",

@@ -4,6 +4,8 @@ package com.spring.luispa.ecommerce_api.api.controller;
 import com.spring.luispa.ecommerce_api.api.dto.request.AddToCartRequest;
 import com.spring.luispa.ecommerce_api.api.dto.request.UpdateCartItemRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.CartResponse;
+import com.spring.luispa.ecommerce_api.infrastructure.ratelimit.RateLimitType;
+import com.spring.luispa.ecommerce_api.infrastructure.ratelimit.RateLimited;
 import com.spring.luispa.ecommerce_api.security.CurrentUser;
 import com.spring.luispa.ecommerce_api.security.UserDetailsImpl;
 import com.spring.luispa.ecommerce_api.services.CartService;
@@ -53,6 +55,7 @@ public class CartController {
     }
 
     @PostMapping("/items")
+    @RateLimited(type = RateLimitType.GENERAL)
     @Operation(summary = "Add to cart", description = "Adds a product to the cart. If it already exists, increases the quantity")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Product successfully added"),
