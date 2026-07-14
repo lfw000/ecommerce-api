@@ -17,11 +17,14 @@ import com.spring.luispa.ecommerce_api.domain.user.Address;
 import com.spring.luispa.ecommerce_api.domain.user.AddressRepository;
 import com.spring.luispa.ecommerce_api.domain.user.User;
 import com.spring.luispa.ecommerce_api.domain.user.UserRepository;
+import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.mappers.OrderMapper;
 import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
 import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import com.spring.luispa.ecommerce_api.shared.exception.UnauthorizedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,18 +46,23 @@ public class OrderService {
     private final PaymentRepository paymentRepository;
     private final OrderMapper orderMapper;
 
+    private static final Logger log = LoggerFactory.getLogger(OrderService.class);
+
+    private final LoggingAspect loggingAspect;
+
     public OrderService(OrderRepository orderRepository,
                         UserRepository userRepository,
                         CartRepository cartRepository,
                         AddressRepository addressRepository,
                         PaymentRepository paymentRepository,
-                        OrderMapper orderMapper) {
+                        OrderMapper orderMapper, LoggingAspect loggingAspect) {
         this.orderRepository = orderRepository;
         this.userRepository = userRepository;
         this.cartRepository = cartRepository;
         this.addressRepository = addressRepository;
         this.paymentRepository = paymentRepository;
         this.orderMapper = orderMapper;
+        this.loggingAspect = loggingAspect;
     }
 
     public OrderResponse findByIdForUser(Long orderId, Long userId) {
@@ -136,6 +144,9 @@ public class OrderService {
 
     @Transactional
     public OrderResponse createOrderFromCart(Long userId, CreateOrderRequest request) {
+        log.info("Creating order for user: {}", userId);
+        loggingAspect.setUserIdInMDC(userId);
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
@@ -143,8 +154,12 @@ public class OrderService {
                 .orElseThrow(() -> new BusinessRuleException("No active cart found for user"));
 
         if (cart.getItems().isEmpty()) {
+            log.warn("Cannot create order - cart is empty for user: {}", userId);
             throw new BusinessRuleException("Cannot create order from empty cart");
         }
+
+        log.debug("Creating order from cart with {} items, subtotal: {}", cart.getItems().size(),
+                cart.getTotalAmount());
 
         validateStock(cart);
 
@@ -179,56 +194,88 @@ public class OrderService {
 
         cartRepository.save(cart);
 
+        log.info("Order created successfully, orderId={}, userId={}, total={}, items={}",
+                savedOrder.getId(), userId, savedOrder.getTotalAmount(), savedOrder.getItems().size());
+
         return orderMapper.toResponse(savedOrder);
     }
 
     @Transactional
     public OrderResponse confirmPayment(Long orderId, String transactionId) {
+        log.info("Confirming payment for order: orderId={}, transactionId={}", orderId, transactionId);
+
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+                .orElseThrow(() -> {
+                    log.warn("Order not found for payment confirmation: order={}", orderId);
+                    return new ResourceNotFoundException("Order not found with id: " + orderId);
+                });
 
         order.confirmPayment(transactionId);
 
         Payment payment = paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Payment not found for order: " + orderId));
+                .orElseThrow(() -> {
+                    log.warn("Payment not found for order: order={}", orderId);
+                    return new ResourceNotFoundException("Payment not found for order: " + orderId);
+                });
 
         payment.complete(transactionId, null);
 
         paymentRepository.save(payment);
+
+        log.info("Payment confirmed: orderId={}, transactionId={}", orderId, transactionId);
 
         return orderMapper.toResponse(order);
     }
 
     @Transactional
     public OrderResponse shipOrder(Long orderId, String trackingNumber) {
+        log.info("Shipping order: orderId={}, trackingNumber={}", orderId, trackingNumber);
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
 
         order.ship(trackingNumber);
+
+        log.info("Order shipped: orderId={}, trackingNumber={}", orderId, trackingNumber);
 
         return orderMapper.toResponse(order);
     }
 
     @Transactional
     public OrderResponse deliverOrder(Long orderId) {
+        log.info("Delivering order: orderId={}", orderId);
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
 
         order.deliver();
+
+        log.info("Order delivered: orderId={}", orderId);
 
         return orderMapper.toResponse(order);
     }
 
     @Transactional
     public OrderResponse cancelOrder(Long orderId, CancelOrderRequest request, Long userId, String userRole ) {
+        log.info("Cancelling order: orderId={}, userId={}, userRole={}, reason={}", orderId, userId, userRole,
+                request.getReason());
+
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+                .orElseThrow(() -> {
+                    log.warn("Order not found for cancellation: orderId={}", orderId);
+                    return new ResourceNotFoundException("Order not found with id: " + orderId);
+                });
 
         if (!"ADMIN".equals(userRole) && !order.getUser().getId().equals(userId)) {
+            log.warn("User {} attempted to cancel order {} belonging to user {}",
+                    userId, orderId, order.getUser().getId());
             throw new UnauthorizedException("Order does not belong to user");
         }
 
         order.cancel(request, userId, userRole);
+
+        log.info("Order cancelled: orderId={}, userId={}, reason={}, role={}", orderId, userId, request.getReason(),
+                userRole);
 
         return orderMapper.toResponse(order);
     }

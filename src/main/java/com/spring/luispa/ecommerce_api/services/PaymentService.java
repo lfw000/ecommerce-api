@@ -9,6 +9,7 @@ import com.spring.luispa.ecommerce_api.domain.order.OrderRepository;
 import com.spring.luispa.ecommerce_api.domain.payment.Payment;
 import com.spring.luispa.ecommerce_api.domain.payment.PaymentRepository;
 import com.spring.luispa.ecommerce_api.domain.payment.RefundTransaction;
+import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.mappers.PaymentMapper;
 import com.spring.luispa.ecommerce_api.shared.enums.CancellationReason;
 import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
@@ -16,6 +17,8 @@ import com.spring.luispa.ecommerce_api.shared.enums.PaymentStatus;
 import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import com.spring.luispa.ecommerce_api.shared.exception.UnauthorizedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,10 +35,15 @@ public class PaymentService {
     private final OrderRepository orderRepository;
     private final PaymentMapper paymentMapper;
 
-    public PaymentService(PaymentRepository paymentRepository, OrderRepository orderRepository, PaymentMapper paymentMapper) {
+    private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
+
+    private final LoggingAspect loggingAspect;
+
+    public PaymentService(PaymentRepository paymentRepository, OrderRepository orderRepository, PaymentMapper paymentMapper, LoggingAspect loggingAspect) {
         this.paymentRepository = paymentRepository;
         this.orderRepository = orderRepository;
         this.paymentMapper = paymentMapper;
+        this.loggingAspect = loggingAspect;
     }
     
     public PaymentResponse findById(Long id, Long userId) {
@@ -43,6 +51,8 @@ public class PaymentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found with id: " + id));
 
         if (!payment.getOrder().getUser().getId().equals(userId)) {
+            log.warn("User attempted to access payment belonging to another user: paymentId={}, ownerId={}",
+                    payment.getId(), payment.getOrder().getUser().getId());
             throw new UnauthorizedException("Payment does not belong to user");
         }
 
@@ -84,18 +94,29 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse processPayment(Long orderId, ProcessPaymentRequest request, Long userId) {
+        loggingAspect.setUserIdInMDC(userId);
+
+        log.info("Processing payment: orderId={}, method={}", orderId, request.getPaymentMethod());
+
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+                .orElseThrow(() -> {
+                    log.warn("Order not found for payment: orderId={}", orderId);
+                    return new ResourceNotFoundException("Order not found with id: " + orderId);
+                });
 
         if (!order.getUser().getId().equals(userId)) {
+            log.warn("User attempted to pay order belonging to another user: orderId={}, ownerId={}", orderId,
+                    order.getUser().getId());
             throw new UnauthorizedException("Order does not belong to user");
         }
 
         if (order.getStatus() != OrderStatus.PENDING) {
+            log.warn("Cannot pay order: orderId={}, currentStatus={}", orderId, order.getStatus());
             throw new BusinessRuleException("Order cannot be paid. Current status: " + order.getStatus());
         }
 
         if (paymentRepository.findByOrderId(orderId).isPresent()) {
+            log.warn("Payment already exists for order: orderId={}", orderId);
             throw new BusinessRuleException("Payment already exists for this order");
         }
 
@@ -110,6 +131,9 @@ public class PaymentService {
         payment.complete(transactionId, paymentDetails);
 
         Payment savedPayment = paymentRepository.save(payment);
+
+        log.info("Payment processed successfully: paymentId={}, orderId={}, transactionId={}, amount={}",
+                savedPayment.getId(), orderId, transactionId, payment.getAmount());
 
         return paymentMapper.toResponse(savedPayment);
     }
@@ -130,20 +154,31 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse refundPayment(Long paymentId, RefundRequest request, Long userId, String userRole) {
+        loggingAspect.setUserIdInMDC(userId);
+
+        log.info("Processing refund: paymentId={}, role={}, amount={}", paymentId, userRole, request.getAmount());
+
         Payment payment = paymentRepository.findById(paymentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
+                .orElseThrow(() -> {
+                    log.warn("Payment not found for refund: paymentId={}", paymentId);
+                    return new ResourceNotFoundException("Payment not found");
+                });
 
         Order order = payment.getOrder();
 
         if (!"ADMIN".equals(userRole) && !order.getUser().getId().equals(userId)) {
+            log.warn("User attempted to refund payment belonging to another user: paymentId={}, ownerId={}",
+                    paymentId, order.getUser().getId());
             throw new UnauthorizedException("Cannot refund this payment");
         }
 
         if (!payment.isRefundable()) {
+            log.warn("Payment cannot be refunded: paymentId={}, currentStatus={}", paymentId, payment.getStatus());
             throw new BusinessRuleException(String.format("Payment cannot be refunded. Current status: %s", payment.getStatus()));
         }
 
         if (order.getStatus() != OrderStatus.SHIPPED || order.getStatus() != OrderStatus.DELIVERED) {
+            log.warn("cannot refund shipped/delivered order: orderId={}, status={}", order.getId(), order.getStatus());
             throw new BusinessRuleException("Cannot refund payment for shipped or delivered orders. Please process a return instead.");
         }
 
@@ -151,19 +186,25 @@ public class PaymentService {
 
         if (request.getAmount() == null || request.getAmount().compareTo(payment.getAmount()) == 0) {
             payment.refund(request.getReason());
+            log.debug("Full refund processed: paymentId={}, amount={}", paymentId, payment.getAmount());
         } else {
             payment.partialRefund(request.getAmount(), request.getReason());
+            log.debug("Partial refund processed: paymentId={}, amount={}", paymentId, request.getAmount());
         }
 
         response = paymentMapper.toResponse(payment);
 
         if (request.isCancelOrderAfterRefund()) {
+            log.debug("Cancelling order after refund: orderId={}", order.getId());
             CancelOrderRequest cancelRequest = new CancelOrderRequest(
                     CancellationReason.ADMIN_CANCELLED,
                     "Order cancelled after refund: " + request.getReason()
             );
             order.cancel(cancelRequest, userId, userRole);
         }
+
+        log.info("Refund processed: paymentId={}, orderId={}, amount={}, reason={}",
+                paymentId, order.getId(), payment.getRefundAmount(), request.getReason());
 
         return response;
     }

@@ -49,23 +49,29 @@ server:
   compression:
     enabled: true
     mime-types: application/json,application/xml,text/html,text/xml,text/plain
+  tomcat:
+    connection-timeout: 20000
+    max-connections: 200
+    threads:
+      max: 200
+      min-spare: 10
 
 # JWT CONFIGURATION
 app:
   jwt:
-    secret: ${JWT_SECRET:AOrfMg84iIUfLt8dop5VE2exjcAPdAAGDW6myepzOE99YvtjzKdfRZMU3Lltzw2XLbem6NiNFMJLtPCZm2y6Qm}
-    expiration-ms: ${JWT_EXPIRATION:900000}}
+    secret: ${JWT_SECRET:}
+    expiration-ms: ${JWT_EXPIRATION:900000}
     refresh-expiration-ms: 604800000
 
 # LOGGING
-logging:
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
-  logback:
-    rollingpolicy:
-      max-file-size: 10MB
-      max-history: 30
+#logging:
+#  pattern:
+#    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+#    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+#  logback:
+#    rollingpolicy:
+#      max-file-size: 10MB
+#      max-history: 30
 
 # ACTUATOR CONFIGURATION
 management:

@@ -1,0 +1,108 @@
+spring:
+  config:
+    activate:
+      on-profile: staging
+
+  # DATASOURCE (TEST DATA)
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      connection-timeout: 20000
+      maximum-pool-size: 15
+      minimum-idle: 3
+      idle-timeout: 600000
+      pool-name: EcommerceStagingHikariPool
+      leak-detection-threshold: 30000
+
+  # JPA
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+
+  # FLYWAY
+  flyway:
+    enabled: true
+    clean-disabled: true
+    validate-on-migrate: true
+    baseline-on-migrate: true
+
+# LOGGING
+logging:
+  level:
+    com.spring.luispa.ecommerce_api: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql: WARN
+    org.springframework.data.jpa: INFO
+  file:
+    name: /var/log/ecommerce-staging/api.log
+    path: /var/log/ecommerce-staging
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 14
+
+# JWT
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: 900000
+    refresh-expiration-ms: 604800000
+
+# RATE LIMITING
+rate-limiting:
+  enabled: true
+  login:
+    capacity: 20
+    refill-time: 60
+  register:
+    capacity: 30
+    refill-time: 60
+  general:
+    capacity: 200
+    refill-time: 60
+  order-creation:
+    capacity: 50
+    refill-time: 60
+  payment-processing:
+    capacity: 25
+    refill-time: 60
+
+# CORS
+cors:
+  allowed-origins:
+    - "https://staging.midominio.com"
+    - "https://staging-api.midominio.com"
+
+# ACTUATOR
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  metrics:
+    export:
+      #prometheus:
+        #enabled: true
+
+# SWAGGER
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha

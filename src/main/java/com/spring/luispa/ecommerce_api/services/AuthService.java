@@ -6,6 +6,7 @@ import com.spring.luispa.ecommerce_api.api.dto.response.JwtResponse;
 import com.spring.luispa.ecommerce_api.api.dto.response.RefreshTokenResponse;
 import com.spring.luispa.ecommerce_api.api.dto.response.UserResponse;
 import com.spring.luispa.ecommerce_api.domain.user.RefreshToken;
+import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.security.JwtUtils;
 import com.spring.luispa.ecommerce_api.security.UserDetailsImpl;
 import com.spring.luispa.ecommerce_api.shared.exception.InvalidCredentialsException;
@@ -28,22 +29,24 @@ public class AuthService {
     private final UserService userService;
     private final AuthenticationManager authenticationManager;
     private final RefreshTokenService refreshTokenService;
+    private final LoggingAspect loggingAspect;
 
     public AuthService(AuthenticationManager authenticationManager,
                        JwtUtils jwtUtils,
                        UserService userService,
-                       RefreshTokenService refreshTokenService) {
+                       RefreshTokenService refreshTokenService, LoggingAspect loggingAspect) {
         this.jwtUtils = jwtUtils;
         this.userService = userService;
         this.authenticationManager = authenticationManager;
         this.refreshTokenService = refreshTokenService;
+        this.loggingAspect = loggingAspect;
     }
 
     @Transactional
     public JwtResponse authenticate(LoginRequest request, String clientIp) {
-        try {
-            logger.info("Login attempt for email: {}", request.getEmail());
+        logger.info("Login attempt: email={}, ip={}", request.getEmail(), clientIp);
 
+        try {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getEmail(),
@@ -73,9 +76,11 @@ public class AuthService {
 
     @Transactional
     public RefreshTokenResponse refreshToken(RefreshTokenRequest request, String clientIp) {
-        logger.info("Refresh token request from IP: {}", clientIp);
+        logger.info("Token refresh request: ip={}", clientIp);
 
         RefreshToken refreshToken = refreshTokenService.verify(request.getRefreshToken(), clientIp);
+
+        loggingAspect.setUserIdInMDC(refreshToken.getUser().getId());
 
         String newAccessToken = jwtUtils.generateTokenFromEmail(refreshToken.getUser().getEmail());
 
@@ -83,7 +88,7 @@ public class AuthService {
 
         refreshTokenService.revoke(request.getRefreshToken(), clientIp);
 
-        logger.info("Refresh token rotated for user: {}", refreshToken.getUser().getEmail());
+        logger.info("Token refresh successful: userId={}, ip={}", refreshToken.getUser().getId(), clientIp);
 
         return new RefreshTokenResponse(
                 newAccessToken,
@@ -93,9 +98,13 @@ public class AuthService {
 
     @Transactional
     public void logout(String refreshToken, String clientIp) {
+        logger.info("Logout request: ip={}", clientIp);
+
         if (refreshToken != null && !refreshToken.isBlank()) {
             refreshTokenService.revoke(refreshToken, clientIp);
             logger.info("Logout successful, refresh token revoked from IP: {}", clientIp);
+        } else {
+            logger.debug("Logout called without refresh token, ip={}", clientIp);
         }
     }
 }

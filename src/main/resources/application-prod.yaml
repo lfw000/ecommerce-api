@@ -3,21 +3,26 @@ spring:
     activate:
       on-profile: prod
 
+  # DATASOURCE
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
       connection-timeout: 30000
-      maximum-pool-size: ${DB_POOL_SIZE:20}
-      minimum-idle: ${DB_MIN_IDLE:5}
+      maximum-pool-size: 20
+      minimum-idle: 5
       idle-timeout: 600000
       pool-name: EcommerceProdHikariPool
       leak-detection-threshold: 60000
       register-mbeans: true
+      validation-timeout: 5000
 
+  # JPA
   jpa:
     show-sql: false
+    hibernate:
+      ddl-auto: none
     properties:
       hibernate:
         format_sql: false
@@ -26,50 +31,101 @@ spring:
           batch_size: 30
         order_inserts: true
         order_updates: true
-    hibernate:
-      ddl-auto: none
+        connection:
+          autocommit: false
 
+  # FLYWAY
   flyway:
+    enabled: true
     clean-disabled: true
+    validate-on-migrate: true
+    baseline-on-migrate: false
 
+# LOGGING
 logging:
   level:
-    com.ecommerce: INFO
+    com.spring.luispa.ecommerce_api: INFO
     org.springframework.web: WARN
     org.springframework.security: WARN
     org.hibernate: WARN
     org.flywaydb: INFO
   file:
-    name: /var/log/ecommerce/api.log
-    path: /var/log/ecommerce
+    name: /var/log/ecommerce-prod/app.log
+    path: /var/log/ecommerce-prod
   logback:
     rollingpolicy:
       max-file-size: 100MB
       max-history: 30
       total-size-cap: 10GB
 
+# JWT
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: 900000
+    refresh-expiration-ms: 604800000
+
+# RATE LIMITING
+rate-limiting:
+  enabled: true
+  login:
+    capacity: 5
+    refill-time: 60
+  register:
+    capacity: 10
+    refill-time: 60
+  general:
+    capacity: 100
+    refill-time: 60
+  order-creation:
+    capacity: 20
+    refill-time: 60
+  payment-processing:
+    capacity: 10
+    refill-time: 60
+
+# CORS
 cors:
   allowed-origins:
-    - "https://tudominio.com"
-    - "https://www.tudominio.com"
+    - "https://midominio.com"
+    - "https://www.midominio.com"
 
+# ACTUATOR
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+    metrics:
+      enabled: true
+  metrics:
+    export:
+      #prometheus:
+        #enabled: true
+  info:
+    env:
+      enabled: true
+
+# SWAGGER
 springdoc:
   api-docs:
     enabled: false
   swagger-ui:
     enabled: false
 
-app:
-  jwt:
-    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus
-  endpoint:
-    health:
-      show-details: when-authorized
-    metrics:
-      enabled: true
+# SERVER
+server:
+  port: 8080
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+    include-exception: false
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+    min-response-size: 2048
