@@ -396,15 +396,19 @@ public class Order extends Auditable {
 
     public void cancel(CancelOrderRequest request, Long userId, String userRole) {
         if (status == OrderStatus.SHIPPED || status == OrderStatus.DELIVERED) {
-            throw new OrderCancellationNotAllowedException(String.format("Cannot cancel order. Current status: %s", status));
+            throw new OrderCancellationNotAllowedException(String.format("Cannot cancel order. Current status: %s",
+                    status));
         }
 
         if (status== OrderStatus.CANCELLED || status == OrderStatus.DELIVERED) {
             throw new OrderAlreadyCancelledException("Order is already cancelled or refunded");
         }
 
-        if ((status == OrderStatus.PAID || status == OrderStatus.PROCESSING) && !isWithinCancellationWindow()) {
-            throw new OrderCancellationWindowExpiredException(String.format("Cancellation window has expired (30 minutes after order)"));
+        if (!"ADMIN".equals(userRole)) {
+            if ((status == OrderStatus.PAID || status == OrderStatus.PROCESSING) && !isWithinCancellationWindow()) {
+                throw new OrderCancellationWindowExpiredException(String.format(
+                        "Cancellation window has expired (30 minutes after order)"));
+            }
         }
 
         this.cancelledBy = userId;
@@ -513,6 +517,21 @@ public class Order extends Auditable {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             this.totalAmount = subtotal;
+        }
+
+        public Builder status(OrderStatus status) {
+            Objects.requireNonNull(status, "Order status cannot be null");
+            this.status = status;
+            return this;
+        }
+
+        public Builder subtotal(BigDecimal subtotal) {
+            Objects.requireNonNull(subtotal, "Subtotal cannot be null");
+            if (subtotal.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Subtotal cannot be negative or zero");
+            }
+            this.subtotal = subtotal;
+            return this;
         }
 
         public Builder shippingCost(BigDecimal shippingCost) {

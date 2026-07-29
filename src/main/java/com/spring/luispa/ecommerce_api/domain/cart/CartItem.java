@@ -55,13 +55,6 @@ public class CartItem extends AuditableBaseEntity {
             throw new IllegalArgumentException("Quantity must be positive");
         }
 
-        if (!product.hasStock(quantity)) {
-            throw new IllegalStateException(String.format("Insufficient stock for product %s. Available: %d, Requested: %d",
-                    product.getSku(),
-                    product.getStock(),
-                    quantity));
-        }
-
         this.cart = cart;
         this.product = product;
         this.quantity = quantity;

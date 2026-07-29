@@ -37,6 +37,12 @@ public class ProductImage extends AuditableBaseEntity {
         // No-args constructor
     }
 
+    public ProductImage(String imageUrl, boolean main, Product product) {
+        this.imageUrl = imageUrl;
+        this.main = main;
+        this.product = product;
+    }
+
     // Getters and setters
 
     public Long getId() {

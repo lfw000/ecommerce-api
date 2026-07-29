@@ -285,11 +285,15 @@ public class OrderService {
     private void validateStock(Cart cart) {
         for (CartItem item : cart.getItems()) {
             Product product = item.getProduct();
-            if (!product.hasStock(item.getQuantity())) {
+            int requestedQuantity = item.getQuantity();
+            int availableStock = product.getStock();
+
+            if (!product.hasStock(requestedQuantity)) {
                 throw new BusinessRuleException(String.format("Insufficient stock for product: %s. Available. %d, Requested: %d",
                         product.getSku(),
                         product.getStock(),
-                        item.getQuantity()));
+                        item.getQuantity()),
+                        "INSUFFICIENT_STOCK");
             }
 
         }
@@ -332,13 +336,6 @@ public class OrderService {
     private BigDecimal calculateTax(BigDecimal subtotal) {
         return subtotal.multiply(new BigDecimal("0.10"));
     }
-
-    //private void createPendingPayment(Order order) {
-    //    Payment payment = new Payment.Builder(order, PaymentMethod.CARD, order.getTotalAmount())
-    //            .build();
-    //
-    //    paymentRepository.save(payment);
-    //}
 
     // Administrator methods
 
