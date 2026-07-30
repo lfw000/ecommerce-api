@@ -35,7 +35,8 @@ public class CartService {
     public CartService(CartRepository cartRepository,
                        UserRepository userRepository,
                        ProductRepository productRepository,
-                       CartMapper cartMapper, LoggingAspect loggingAspect) {
+                       CartMapper cartMapper,
+                       LoggingAspect loggingAspect) {
         this.cartRepository = cartRepository;
         this.userRepository = userRepository;
         this.productRepository = productRepository;
