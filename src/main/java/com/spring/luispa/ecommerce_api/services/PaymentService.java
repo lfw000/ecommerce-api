@@ -177,7 +177,7 @@ public class PaymentService {
             throw new BusinessRuleException(String.format("Payment cannot be refunded. Current status: %s", payment.getStatus()));
         }
 
-        if (order.getStatus() != OrderStatus.SHIPPED || order.getStatus() != OrderStatus.DELIVERED) {
+        if (order.getStatus() == OrderStatus.SHIPPED || order.getStatus() == OrderStatus.DELIVERED) {
             log.warn("cannot refund shipped/delivered order: orderId={}, status={}", order.getId(), order.getStatus());
             throw new BusinessRuleException("Cannot refund payment for shipped or delivered orders. Please process a return instead.");
         }
@@ -275,6 +275,11 @@ public class PaymentService {
         LocalDateTime expirationDate = LocalDateTime.now().minusMinutes(30);
         List<Payment> pendingPayments = paymentRepository.findPendingPaymentsOlderThan(
                 PaymentStatus.PENDING, expirationDate);
+
+        if (pendingPayments.isEmpty()) {
+            log.debug("No expired pending payments found");
+            return;
+        }
 
         for (Payment payment : pendingPayments) {
             payment.fail("Payment expired");
