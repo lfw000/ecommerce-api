@@ -43,10 +43,7 @@ public class ProductService {
     }
 
     public ProductResponse findById(Long id) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = SecurityUtils.isAdmin();
 
         Product product;
 
@@ -312,8 +309,6 @@ public class ProductService {
 
         log.info("Stock adjusted: productId={}, sku={}, delta={}, oldStock={}, newStock={}", productId,
                 product.getSku(), delta, oldStock, newStock);
-
-        product.adjust(delta);
     }
 
     @Transactional
