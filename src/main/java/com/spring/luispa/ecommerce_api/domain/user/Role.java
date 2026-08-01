@@ -38,6 +38,10 @@ public class Role extends AuditableBaseEntity {
         this.description = description;
     }
 
+    public Role(RoleName roleName) {
+        this.name = roleName;
+    }
+
     // Getters and setters
 
     public Long getId() {
