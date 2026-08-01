@@ -100,10 +100,12 @@ public class CategoryService {
                     parent.getId(),  parent.getName());
         }
 
-        log.info("Creating category: categoryId={}, name={}, parentId={}",
-                category.getId(), category.getName(), request.getParentId());
+        Category savedCategory = categoryRepository.save(category);
 
-        return categoryMapper.toResponse(category);
+        log.info("Creating category: categoryId={}, name={}, parentId={}",
+                savedCategory.getId(), savedCategory.getName(), request.getParentId());
+
+        return categoryMapper.toResponse(savedCategory);
     }
 
     @Transactional

@@ -6,6 +6,7 @@ public class CategoryTestHelper {
 
     public static Category defaultCategory() {
         Category category = new Category("Electronics");
+        category.setDescription("Electronic products");
         category.setId(1L);
         category.setActive(true);
         category.setDisplayOrder(1);
