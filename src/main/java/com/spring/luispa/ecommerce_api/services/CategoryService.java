@@ -33,7 +33,7 @@ public class CategoryService {
     }
 
     public CategoryResponse findById(Long id) {
-        Category category = categoryRepository.findById(id)
+        Category category = categoryRepository.findActiveById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
 
         return categoryMapper.toResponse(category);
@@ -59,7 +59,7 @@ public class CategoryService {
     }
 
     public List<CategoryResponse> findRootCategories() {
-        List<Category> categories = categoryRepository.findByParentCategoryIsNull();
+        List<Category> categories = categoryRepository.findActiveRootCategories();
 
         return  categoryMapper.toResponseList(categories);
     }
@@ -67,7 +67,7 @@ public class CategoryService {
     public List<CategoryResponse> findSubcategories(Long parentId) {
         findById(parentId);
 
-        List<Category> categories = categoryRepository.findByParentCategoryId(parentId);
+        List<Category> categories = categoryRepository.findActiveByParentCategoryId(parentId);
 
         return categoryMapper.toResponseList(categories);
     }

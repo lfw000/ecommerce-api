@@ -3,7 +3,6 @@ package com.spring.luispa.ecommerce_api.api.controller;
 import com.spring.luispa.ecommerce_api.api.dto.request.CreateCategoryRequest;
 import com.spring.luispa.ecommerce_api.api.dto.request.UpdateCategoryRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.CategoryResponse;
-import com.spring.luispa.ecommerce_api.domain.product.Category;
 import com.spring.luispa.ecommerce_api.services.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -76,7 +75,7 @@ public class CategoryController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Create category (admin)")
     public ResponseEntity<CategoryResponse> createCategory(@Valid @RequestBody CreateCategoryRequest request) {
-        return ResponseEntity.status(HttpStatus.OK).body(categoryService.createCategory(request));
+        return ResponseEntity.status(HttpStatus.CREATED).body(categoryService.createCategory(request));
     }
 
     @PutMapping("/{id}")
@@ -107,7 +106,7 @@ public class CategoryController {
             @PathVariable Long id) {
                 categoryService.deleteCategory(id);
 
-        return ResponseEntity.status(HttpStatus.OK).build();
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
     @PutMapping("/{id}/move")
