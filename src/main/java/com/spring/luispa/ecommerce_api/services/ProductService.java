@@ -6,7 +6,6 @@ import com.spring.luispa.ecommerce_api.api.dto.response.ProductResponse;
 import com.spring.luispa.ecommerce_api.domain.product.*;
 import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.mappers.ProductMapper;
-import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
 import com.spring.luispa.ecommerce_api.shared.exception.DuplicateResourceException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import com.spring.luispa.ecommerce_api.shared.security.SecurityUtils;
@@ -14,8 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

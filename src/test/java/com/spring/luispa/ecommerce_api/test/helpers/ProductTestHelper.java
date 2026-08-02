@@ -1,5 +1,6 @@
 package com.spring.luispa.ecommerce_api.test.helpers;
 
+import com.spring.luispa.ecommerce_api.domain.product.Category;
 import com.spring.luispa.ecommerce_api.domain.product.Product;
 import com.spring.luispa.ecommerce_api.domain.product.ProductAttributes;
 import com.spring.luispa.ecommerce_api.domain.product.ProductImage;
@@ -9,6 +10,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class ProductTestHelper {
+
+    // Methods for unit tests
 
     public static Product defaultProduct() {
         return Product.builder(
@@ -76,5 +79,81 @@ public class ProductTestHelper {
         images.add(new ProductImage("https://example.com/image2.jpg", false, product));
         product.setImages(images);
         return product;
+    }
+
+    // Methods for integration tests
+
+    public static Product newProduct() {
+        return Product.builder(
+                        "LAP-INT-001",
+                        "Laptop Integration",
+                        new BigDecimal("1599.99"),
+                        CategoryTestHelper.newCategory())
+                .description("Laptop para integración")
+                .stock(10)
+                .active(true)
+                .featured(false)
+                .build();
+    }
+
+    public static Product newProduct(String sku, String name) {
+        return Product.builder(
+                        sku,
+                        name,
+                        new BigDecimal("999.99"),
+                        CategoryTestHelper.newCategory())
+                .stock(10)
+                .active(true)
+                .featured(false)
+                .build();
+    }
+
+    public static Product newProductWithCategory(Category category) {
+        return Product.builder(
+                        "LAP-INT-001",
+                        "Laptop Integration",
+                        new BigDecimal("1599.99"),
+                        category)
+                .description("Laptop para integración")
+                .stock(10)
+                .active(true)
+                .featured(false)
+                .build();
+    }
+
+    public static Product newProductWithStock(int stock) {
+        return Product.builder(
+                        "LAP-STOCK-001",
+                        "Laptop Stock",
+                        new BigDecimal("1599.99"),
+                        CategoryTestHelper.newCategory())
+                .stock(stock)
+                .active(true)
+                .featured(false)
+                .build();
+    }
+
+    public static Product newInactiveProduct() {
+        return Product.builder(
+                        "LAP-INACTIVE-001",
+                        "Laptop Inactive",
+                        new BigDecimal("1599.99"),
+                        CategoryTestHelper.newCategory())
+                .active(false)
+                .stock(10)
+                .featured(false)
+                .build();
+    }
+
+    public static Product newFeaturedProduct() {
+        return Product.builder(
+                        "LAP-FEATURED-001",
+                        "Laptop Featured",
+                        new BigDecimal("1999.99"),
+                        CategoryTestHelper.newCategory())
+                .stock(5)
+                .active(true)
+                .featured(true)
+                .build();
     }
 }
