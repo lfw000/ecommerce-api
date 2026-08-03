@@ -50,4 +50,24 @@ public class UserTestHelper {
         return user;
     }
 
+    // Extra methods for integration tests
+
+    public static User adminUser() {
+        User user = User.builder(
+                        "admin@example.com",
+                        "admin123",
+                        "Admin",
+                        "User")
+                .enabled(true)
+                .build();
+        // The rol is assigned on the service or test
+        return user;
+    }
+
+    public static User adminUser(Long id) {
+        User user = adminUser();
+        user.setId(id);
+        return user;
+    }
+
 }
