@@ -51,7 +51,7 @@ logging:
 # JWT
 app:
   jwt:
-    secret: testSecretKeyForUnitTests1234567890
+    secret: testSecretKeyForHS512AlgorithmWith64CharactersLongAndSecure1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ
     expiration-ms: 3600000
     refresh-expiration-ms: 604800000
 

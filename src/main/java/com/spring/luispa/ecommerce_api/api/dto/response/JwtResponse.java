@@ -41,6 +41,10 @@ public class JwtResponse {
     @Schema(description = "Token expiration date", example = "2024-12-05T10:00:00")
     private LocalDateTime expiresAt;
 
+    public JwtResponse() {
+        // No-args constructor
+    }
+
     public JwtResponse(String token, String refreshToken, UserResponse user) {
         this.token = token;
         this.refreshToken = refreshToken;
