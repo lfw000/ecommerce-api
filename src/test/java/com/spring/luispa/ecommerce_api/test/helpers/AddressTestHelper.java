@@ -101,4 +101,18 @@ public class AddressTestHelper {
                 .addressType(AddressType.SHIPPING)
                 .build();
     }
+
+    public static Address newAddressWithUser(User user) {
+        return Address.builder()
+                .user(user)
+                .street("Av. Reforma 123")
+                .addressLine2("Piso 5, Oficina 502")
+                .city("Ciudad de México")
+                .state("CDMX")
+                .zipCode("06500")
+                .country("México")
+                .phoneNumber("+52 55 1234 5678")
+                .addressType(AddressType.SHIPPING)
+                .build();
+    }
 }

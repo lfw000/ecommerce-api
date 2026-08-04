@@ -24,5 +24,7 @@ public interface OrderMapper {
     @Mapping(source = "product.id", target = "productId")
     @Mapping(source = "product.sku", target = "productSku")
     @Mapping(source = "product.name", target = "productName")
+    OrderItemResponse toItemResponse(OrderItem orderItem);
+
     List<OrderItemResponse> toItemResponseList(List<OrderItem> items);
 }

@@ -42,7 +42,6 @@ public class Order extends Auditable {
     @OneToMany(mappedBy = "order", cascade =  {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
-
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
