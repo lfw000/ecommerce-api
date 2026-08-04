@@ -88,7 +88,7 @@ public class CartController {
     public ResponseEntity<CartResponse> removeFromCart(@CurrentUser UserDetailsImpl currentUser,
                                                        @Parameter(description = "ID of the product to remove", example = "1")
                                                        @PathVariable Long productId) {
-        return ResponseEntity.status(HttpStatus.OK).body(cartService.removeFromCart(currentUser.getId(), productId));
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).body(cartService.removeFromCart(currentUser.getId(), productId));
     }
 
     @DeleteMapping
@@ -97,6 +97,6 @@ public class CartController {
     public ResponseEntity<Void> clearCart(@CurrentUser UserDetailsImpl currentUser) {
         cartService.clearCart(currentUser.getId());
 
-        return ResponseEntity.status(HttpStatus.OK).build();
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }
