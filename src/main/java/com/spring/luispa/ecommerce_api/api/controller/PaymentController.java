@@ -65,6 +65,14 @@ public class PaymentController {
         return ResponseEntity.ok(paymentService.processPayment(orderId, request, currentUser.getId() ));
     }
 
+    @GetMapping("/user")
+    @Operation(summary = "Get user payments", description = "Retrieves all payments of the authenticated user")
+        @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Payments retrieved successfully")})
+    public ResponseEntity<List<PaymentResponse>> getUserPayments(@CurrentUser UserDetailsImpl currentUser) {
+        return ResponseEntity.ok(paymentService.findPaymentsByUserId(currentUser.getId()));
+    }
+
     // Administrator endpoints
 
     @GetMapping("/{id}")

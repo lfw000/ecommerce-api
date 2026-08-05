@@ -74,7 +74,12 @@ public class PaymentService {
     }
 
     public List<PaymentResponse> findPaymentsByUserId(Long userId) {
+        log.info("Finding payments for uer: {}", userId);
         List<Payment> payments = paymentRepository.findPaymentsByUserId(userId);
+        log.info("Found {} payments", payments.size());
+        if (!payments.isEmpty()) {
+            log.debug("First payment: id={}, orderId={}", payments.get(0).getId(), payments.get(0).getOrder().getId());
+        }
 
         return paymentMapper.toResponseList(payments);
     }

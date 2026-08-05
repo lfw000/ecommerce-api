@@ -24,7 +24,7 @@ public class Payment extends Auditable {
     private Long id;
 
     @NotNull
-    @Column(unique = true, nullable = false, length = 25)
+    @Column(unique = true, nullable = false, length = 36)
     private String paymentNumber;
 
     @OneToOne(fetch = FetchType.LAZY)
