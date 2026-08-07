@@ -44,6 +44,33 @@ public class CartService {
         this.loggingAspect = loggingAspect;
     }
 
+    private Cart getOrCreateActiveCart(Long userId) {
+        return cartRepository.findActiveCartByUserId(userId)
+                .orElseGet(() -> {
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+                    Cart newCart = new Cart(user);
+
+                    return cartRepository.save(newCart);
+                });
+    }
+
+    private Cart getOrCreateActiveCartWithItems(Long userId) {
+        return cartRepository.findActiveCartWithItems(userId)
+                .orElseGet(() -> {
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+                    return new Cart(user);
+                });
+    }
+
+    public Cart getActiveCartForCheckout(Long userId) {
+        return cartRepository.findCartForCheckout(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("No active cart found for user"));
+    }
+
     public CartResponse getActiveCart(Long userId) {
         Cart cart = getOrCreateActiveCart(userId);
 
@@ -92,26 +119,6 @@ public class CartService {
                 userId, request.getProductId(), request.getQuantity(), savedCart.getTotalItems());
 
         return cartMapper.toResponse(savedCart);
-    }
-
-    private Cart getOrCreateActiveCart(Long userId) {
-        return cartRepository.findActiveCartByUserId(userId)
-                .orElseGet(() -> {
-                    User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-
-                    return new Cart(user);
-                });
-    }
-
-    private Cart getOrCreateActiveCartWithItems(Long userId) {
-        return cartRepository.findActiveCartWithItems(userId)
-                .orElseGet(() -> {
-                    User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-
-                    return new Cart(user);
-                });
     }
 
     @Transactional

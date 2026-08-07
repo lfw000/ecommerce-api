@@ -10,6 +10,7 @@ import com.spring.luispa.ecommerce_api.domain.product.CategoryRepository;
 import com.spring.luispa.ecommerce_api.domain.product.Product;
 import com.spring.luispa.ecommerce_api.domain.product.ProductRepository;
 import com.spring.luispa.ecommerce_api.domain.user.*;
+import com.spring.luispa.ecommerce_api.services.CartService;
 import com.spring.luispa.ecommerce_api.shared.enums.CancellationReason;
 import com.spring.luispa.ecommerce_api.shared.enums.RoleName;
 import com.spring.luispa.ecommerce_api.test.helpers.*;
@@ -71,6 +72,8 @@ class OrderControllerIntegrationTest {
     private Product testProduct;
     private Address testAddress;
     private CreateOrderRequest createOrderRequest;
+    @Autowired
+    private CartService cartService;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -168,8 +171,21 @@ class OrderControllerIntegrationTest {
         }
 
         @Test
+        @DisplayName("Should return 404 when user has no cart")
+        void shouldReturn404_whenUserHasNoCart() throws Exception {
+            mockMvc.perform(post("/api/orders")
+                            .header("Authorization", "Bearer " + accessToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(createOrderRequest)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
+        }
+
+        @Test
         @DisplayName("Should return 400 when cart is empty")
         void shouldReturn400_whenCartIsEmpty() throws Exception {
+            cartService.getActiveCart(userId);
+
             mockMvc.perform(post("/api/orders")
                             .header("Authorization", "Bearer " + accessToken)
                             .contentType(MediaType.APPLICATION_JSON)

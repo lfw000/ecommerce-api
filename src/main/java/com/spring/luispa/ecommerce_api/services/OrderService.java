@@ -14,13 +14,16 @@ import com.spring.luispa.ecommerce_api.domain.payment.Payment;
 import com.spring.luispa.ecommerce_api.domain.payment.PaymentRepository;
 import com.spring.luispa.ecommerce_api.domain.product.Product;
 import com.spring.luispa.ecommerce_api.domain.user.Address;
-import com.spring.luispa.ecommerce_api.domain.user.AddressRepository;
 import com.spring.luispa.ecommerce_api.domain.user.User;
-import com.spring.luispa.ecommerce_api.domain.user.UserRepository;
 import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.mappers.OrderMapper;
+import com.spring.luispa.ecommerce_api.services.calculation.OrderCalculator;
+import com.spring.luispa.ecommerce_api.services.factory.OrderFactory;
+import com.spring.luispa.ecommerce_api.services.management.StockManager;
+import com.spring.luispa.ecommerce_api.services.validation.OrderValidator;
 import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
 import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
+import com.spring.luispa.ecommerce_api.shared.exception.OrderCancellationNotAllowedException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import com.spring.luispa.ecommerce_api.shared.exception.UnauthorizedException;
 import org.slf4j.Logger;
@@ -39,31 +42,34 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class OrderService {
 
-    private final OrderRepository orderRepository;
-    private final UserRepository userRepository;
-    private final CartRepository cartRepository;
-    private final AddressRepository addressRepository;
-    private final PaymentRepository paymentRepository;
-    private final OrderMapper orderMapper;
-
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
+    private final OrderRepository orderRepository;
+    private final CartRepository cartRepository;
+    private final PaymentRepository paymentRepository;
+    private final OrderValidator orderValidator;
+    private final OrderCalculator orderCalculator;
+    private final StockManager stockManager;
+    private final OrderFactory orderFactory;
+    private final OrderMapper orderMapper;
     private final LoggingAspect loggingAspect;
 
     public OrderService(OrderRepository orderRepository,
-                        UserRepository userRepository,
                         CartRepository cartRepository,
-                        AddressRepository addressRepository,
                         PaymentRepository paymentRepository,
-                        OrderMapper orderMapper, LoggingAspect loggingAspect) {
+                        OrderMapper orderMapper, LoggingAspect loggingAspect, OrderValidator orderValidator, OrderCalculator orderCalculator, StockManager stockManager, OrderFactory orderFactory) {
         this.orderRepository = orderRepository;
-        this.userRepository = userRepository;
+        this.orderCalculator = orderCalculator;
+        this.stockManager = stockManager;
+        this.orderFactory = orderFactory;
         this.cartRepository = cartRepository;
-        this.addressRepository = addressRepository;
         this.paymentRepository = paymentRepository;
         this.orderMapper = orderMapper;
         this.loggingAspect = loggingAspect;
+        this.orderValidator = orderValidator;
     }
+
+    // Methods for regular users
 
     public OrderResponse findByIdForUser(Long orderId, Long userId) {
         Order order = orderRepository.findById(orderId)
@@ -98,31 +104,7 @@ public class OrderService {
         return orderMapper.toResponse(order);
     }
 
-    public OrderResponse findById(Long id) {
-        Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
-
-        return orderMapper.toResponse(order);
-    }
-
-    public OrderResponse findByOrderNumber(String orderNumber) {
-        Order order = orderRepository.findByOrderNumber(orderNumber)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with order number: " + orderNumber));
-
-        return orderMapper.toResponse(order);
-    }
-
-    public OrderResponse findOrderDetailById(Long id) {
-        Order order = orderRepository.findOrderDetailById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
-
-        return orderMapper.toResponse(order);
-    }
-
     public List<OrderResponse> findByUserId(Long userId) {
-        userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-
         List<Order> orders = orderRepository.findByUserId(userId);
 
         return orderMapper.toResponseList(orders);
@@ -147,51 +129,43 @@ public class OrderService {
         log.info("Creating order for user: {}", userId);
         loggingAspect.setUserIdInMDC(userId);
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+        User user = orderValidator.validateUser(userId);
+        Cart cart = orderValidator.validateCart(userId);
+        orderValidator.validateStock(cart);
 
-        Cart cart = cartRepository.findCartForCheckout(userId)
-                .orElseThrow(() -> new BusinessRuleException("No active cart found for user"));
-
-        if (cart.getItems().isEmpty()) {
-            log.warn("Cannot create order - cart is empty for user: {}", userId);
-            throw new BusinessRuleException("Cannot create order from empty cart");
-        }
+        Address shippingAddress = orderValidator.validateAddress(request.getShippingAddressId(), userId);
+        Address billingAddress = orderValidator.validateAddress(request.getBillingAddressId(), userId);
 
         log.debug("Creating order from cart with {} items, subtotal: {}", cart.getItems().size(),
                 cart.getTotalAmount());
 
-        validateStock(cart);
-
-        Address shippingAddress = getAddress(request.getShippingAddressId(), userId);
-        Address billingAddress = getAddress(request.getBillingAddressId(), userId);
-
         Set<OrderItem> orderItems = cart.getItems().stream()
-                .map(cartItem -> new OrderItem.Builder(
-                        cartItem.getProduct(),
-                        cartItem.getQuantity())
-                        .unitPrice(cartItem.getPrice())
-                        .build())
-                .collect(Collectors.toSet());
+                        .map(cartItem -> new OrderItem.Builder(
+                                cartItem.getProduct(),
+                                cartItem.getQuantity())
+                                .unitPrice(cartItem.getPrice())
+                                .build())
+                        .collect(Collectors.toSet());
 
-        BigDecimal subtotal = cart.getTotalAmount();
-        BigDecimal shippingCost = calculateShippingCost(cart);
-        BigDecimal taxAmount = calculateTax(subtotal);
+        BigDecimal subtotal = orderCalculator.calculateSubtotal(cart);
+        BigDecimal shippingCost = orderCalculator.calculateShippingCost(cart);
+        BigDecimal taxAmount = orderCalculator.calculateTax(subtotal);
 
-        Order order = new Order.Builder(user, shippingAddress, billingAddress, orderItems)
-                .shippingCost(shippingCost)
-                .taxAmount(taxAmount)
-                .shippingMethod(request.getShippingMethod())
-                .estimateDeliveryDate(LocalDateTime.now().plusDays(5))
-                .notes(request.getNotes())
-                .build();
+        Order order = orderFactory.createOrder(
+                user,
+                shippingAddress,
+                billingAddress,
+                orderItems,
+                subtotal,
+                shippingCost,
+                taxAmount,
+                request.getShippingMethod(),
+                request.getNotes());
 
         Order savedOrder = orderRepository.save(order);
 
-        updateStock(cart);
-
+        stockManager.reserveStock(cart);
         cart.markAsConverted();
-
         cartRepository.save(cart);
 
         log.info("Order created successfully, orderId={}, userId={}, total={}, items={}",
@@ -210,13 +184,13 @@ public class OrderService {
                     return new ResourceNotFoundException("Order not found with id: " + orderId);
                 });
 
-        order.confirmPayment(transactionId);
-
         Payment payment = paymentRepository.findByOrderId(orderId)
                 .orElseThrow(() -> {
                     log.warn("Payment not found for order: order={}", orderId);
                     return new ResourceNotFoundException("Payment not found for order: " + orderId);
                 });
+
+        order.confirmPayment(transactionId);
 
         payment.complete(transactionId, null);
 
@@ -272,69 +246,22 @@ public class OrderService {
             throw new UnauthorizedException("Order does not belong to user");
         }
 
+        if (!order.isCancellable()) {
+            log.warn("Cannot cancel order: orderId={}, currentStatus={}", orderId, order.getStatus());
+            throw new OrderCancellationNotAllowedException("Order cannot be cancelled in current status: " + order.getStatus());
+        }
+
         order.cancel(request, userId, userRole);
+        
+        if (order.getPayment() != null && order.getPayment().isRefundable()) {
+            stockManager.releaseStock(order);
+            log.debug("Stock released for cancelled order: orderId={}", orderId);
+        }
 
         log.info("Order cancelled: orderId={}, userId={}, reason={}, role={}", orderId, userId, request.getReason(),
                 userRole);
 
         return orderMapper.toResponse(order);
-    }
-
-    // Helper methods
-
-    private void validateStock(Cart cart) {
-        for (CartItem item : cart.getItems()) {
-            Product product = item.getProduct();
-            int requestedQuantity = item.getQuantity();
-            int availableStock = product.getStock();
-
-            if (!product.hasStock(requestedQuantity)) {
-                throw new BusinessRuleException(String.format("Insufficient stock for product: %s. Available. %d, Requested: %d",
-                        product.getSku(),
-                        product.getStock(),
-                        item.getQuantity()),
-                        "INSUFFICIENT_STOCK");
-            }
-
-        }
-    }
-
-    private void updateStock(Cart cart) {
-        for (CartItem item : cart.getItems()) {
-            Product product = item.getProduct();
-            product.decreaseStock(item.getQuantity());
-        }
-    }
-
-    private void restoreStock(Order order) {
-        for (OrderItem item : order.getItems()) {
-            Product product = item.getProduct();
-            product.increaseStock(item.getQuantity());
-        }
-    }
-
-    private Address getAddress(Long addressId, Long userId) {
-        Address address = addressRepository.findById(addressId)
-                .orElseThrow(() -> new ResourceNotFoundException("Address not found with id: " + addressId));
-
-        if (!address.getUser().getId().equals(userId)) {
-            throw new BusinessRuleException("Address does not belong to the user");
-        }
-
-        return address;
-    }
-
-    private BigDecimal calculateShippingCost(Cart cart) {
-        BigDecimal total = cart.getTotalAmount();
-        if (total.compareTo(new BigDecimal("100")) >= 0) {
-            return BigDecimal.ZERO;
-        }
-
-        return new BigDecimal("10.00");
-    }
-
-    private BigDecimal calculateTax(BigDecimal subtotal) {
-        return subtotal.multiply(new BigDecimal("0.10"));
     }
 
     // Administrator methods
@@ -381,6 +308,29 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
 
         order.deliver();
+        return orderMapper.toResponse(order);
+    }
+
+    // Common queries
+
+    public OrderResponse findById(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
+
+        return orderMapper.toResponse(order);
+    }
+
+    public OrderResponse findByOrderNumber(String orderNumber) {
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with order number: " + orderNumber));
+
+        return orderMapper.toResponse(order);
+    }
+
+    public OrderResponse findOrderDetailById(Long id) {
+        Order order = orderRepository.findOrderDetailById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + id));
+
         return orderMapper.toResponse(order);
     }
 
