@@ -174,13 +174,7 @@ public class CartService {
                 });
 
         Cart cart = cartRepository.findActiveCartWithItems(userId)
-                .orElseGet(() -> {
-                    log.warn("No active cart found for removal: userId={}", userId);
-
-                    User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-                    return new Cart(user);
-                });
+                        .orElseThrow(() -> new ResourceNotFoundException("No active cart found for user"));
 
         cart.removeItem(product);
 

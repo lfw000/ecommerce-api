@@ -14,6 +14,7 @@ import com.spring.luispa.ecommerce_api.domain.product.Product;
 import com.spring.luispa.ecommerce_api.domain.product.ProductRepository;
 import com.spring.luispa.ecommerce_api.domain.user.Role;
 import com.spring.luispa.ecommerce_api.domain.user.RoleRepository;
+import com.spring.luispa.ecommerce_api.services.CartService;
 import com.spring.luispa.ecommerce_api.shared.enums.RoleName;
 import com.spring.luispa.ecommerce_api.test.helpers.CategoryTestHelper;
 import com.spring.luispa.ecommerce_api.test.helpers.ProductTestHelper;
@@ -62,9 +63,13 @@ class CartControllerIntegrationTest {
     @Autowired
     private RoleRepository roleRepository;
 
+    @Autowired
+    private CartService cartService;
+
     private String accessToken;
     private Long userId;
     private Product testProduct;
+
 
 
     @BeforeEach
@@ -332,12 +337,15 @@ class CartControllerIntegrationTest {
         void shouldReturn200_whenProductNotInCart() throws Exception {
             mockMvc.perform(delete("/api/cart/items/{productId}", 99999L)
                             .header("Authorization", "Bearer " + accessToken))
-                    .andExpect(status().isNotFound());
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.errorCode").value("RESOURCE_NOT_FOUND"));
         }
 
         @Test
         @DisplayName("Should return 204 when product is not in cart")
         void shouldReturn204_whenProductNotInCart() throws Exception {
+            cartService.getActiveCart(userId);
+
             // Product exists (testProduct), but never was added to the cart
             mockMvc.perform(delete("/api/cart/items/{productId}", testProduct.getId())
                             .header("Authorization", "Bearer " + accessToken))

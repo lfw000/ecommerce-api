@@ -255,8 +255,8 @@ public class CartServiceTest {
             when(cartRepository.findActiveCartWithItems(1L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> cartService.removeFromCart(1L, 1L))
-                    .isInstanceOf(BusinessRuleException.class)
-                    .hasMessageContaining("No active cart found");
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("No active cart found for user");
         }
     }
 
@@ -283,11 +283,14 @@ public class CartServiceTest {
         void shouldCreateNewCart_whenNoActiveCart() {
             when(cartRepository.findActiveCartByUserId(1L)).thenReturn(Optional.empty());
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(cartRepository.save(any(Cart.class))).thenReturn(testCart);
+
             when(cartMapper.toResponse(any(Cart.class))).thenReturn(testResponse);
 
             CartResponse result = cartService.getActiveCart(1L);
 
             assertThat(result).isNotNull();
+            verify(cartRepository).save(any(Cart.class));
         }
 
         @Test

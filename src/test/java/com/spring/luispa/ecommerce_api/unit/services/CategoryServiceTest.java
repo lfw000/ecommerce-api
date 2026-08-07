@@ -342,9 +342,12 @@ class CategoryServiceTest {
     class QueryTests {
 
         @Test
-        @DisplayName("Should return category by ID")
-        void shouldReturnCategoryById() {
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(testCategory));
+        @DisplayName("Should return category by ID when active")
+        void shouldReturnCategoryById_whenActive() {
+            Category category = CategoryTestHelper.defaultCategory(1L);
+            category.setActive(true);
+
+            when(categoryRepository.findActiveById(1L)).thenReturn(Optional.of(category));
             when(categoryMapper.toResponse(any(Category.class))).thenReturn(testResponse);
 
             CategoryResponse result = categoryService.findById(1L);
@@ -353,13 +356,26 @@ class CategoryServiceTest {
             assertThat(result.getId()).isEqualTo(1L);
         }
 
+        //@Test
+        //@DisplayName("Should return category by ID")
+        //void shouldReturnCategoryById() {
+        //    when(categoryRepository.findById(1L)).thenReturn(Optional.of(testCategory));
+        //    when(categoryMapper.toResponse(any(Category.class))).thenReturn(testResponse);
+        //
+        //    CategoryResponse result = categoryService.findById(1L);
+        //
+        //    assertThat(result).isNotNull();
+        //    assertThat(result.getId()).isEqualTo(1L);
+        //}
+
         @Test
         @DisplayName("Should throw exception when category not found by ID")
         void shouldThrowException_whenCategoryNotFoundById() {
-            when(categoryRepository.findById(999L)).thenReturn(Optional.empty());
+            when(categoryRepository.findActiveById(999L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> categoryService.findById(999L))
-                    .isInstanceOf(ResourceNotFoundException.class);
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Category not found");
         }
 
         @Test
@@ -417,7 +433,6 @@ class CategoryServiceTest {
         @Test
         @DisplayName("Should return root categories")
         void shouldReturnRootCategories() {
-            when(categoryRepository.findByParentCategoryIsNull()).thenReturn(List.of(testCategory));
             when(categoryMapper.toResponseList(anyList())).thenReturn(List.of(testResponse));
 
             List<CategoryResponse> results = categoryService.findRootCategories();
@@ -429,16 +444,22 @@ class CategoryServiceTest {
         @Test
         @DisplayName("Should return subcategories")
         void shouldReturnSubcategories() {
-            Category subCategory = CategoryTestHelper.defaultCategory(2L);
-            subCategory.setParentCategory(testCategory);
+            Category parent = CategoryTestHelper.defaultCategory(1L);
+            parent.setActive(true);
 
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(testCategory));
-            when(categoryRepository.findByParentCategoryId(1L)).thenReturn(List.of(subCategory));
+            Category sub = CategoryTestHelper.defaultCategory(2L);
+            sub.setActive(true);
+            sub.setParentCategory(parent);
+
+            when(categoryRepository.findActiveById(1L)).thenReturn(Optional.of(parent));
+            when(categoryRepository.findActiveByParentCategoryId(1L)).thenReturn(List.of(sub));
             when(categoryMapper.toResponseList(anyList())).thenReturn(List.of(testResponse));
 
             List<CategoryResponse> results = categoryService.findSubcategories(1L);
 
             assertThat(results).hasSize(1);
+            verify(categoryRepository).findActiveById(1L);
+            verify(categoryRepository).findActiveByParentCategoryId(1L);
         }
 
         @Test

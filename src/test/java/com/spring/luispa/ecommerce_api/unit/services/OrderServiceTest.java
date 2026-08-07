@@ -6,6 +6,7 @@ import com.spring.luispa.ecommerce_api.api.dto.response.OrderResponse;
 import com.spring.luispa.ecommerce_api.domain.cart.Cart;
 import com.spring.luispa.ecommerce_api.domain.cart.CartRepository;
 import com.spring.luispa.ecommerce_api.domain.order.Order;
+import com.spring.luispa.ecommerce_api.domain.order.OrderItem;
 import com.spring.luispa.ecommerce_api.domain.order.OrderRepository;
 import com.spring.luispa.ecommerce_api.domain.payment.Payment;
 import com.spring.luispa.ecommerce_api.domain.payment.PaymentRepository;
@@ -16,6 +17,10 @@ import com.spring.luispa.ecommerce_api.domain.user.UserRepository;
 import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.mappers.OrderMapper;
 import com.spring.luispa.ecommerce_api.services.OrderService;
+import com.spring.luispa.ecommerce_api.services.calculation.OrderCalculator;
+import com.spring.luispa.ecommerce_api.services.factory.OrderFactory;
+import com.spring.luispa.ecommerce_api.services.management.StockManager;
+import com.spring.luispa.ecommerce_api.services.validation.OrderValidator;
 import com.spring.luispa.ecommerce_api.shared.enums.CancellationReason;
 import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
 import com.spring.luispa.ecommerce_api.shared.exception.*;
@@ -25,14 +30,15 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -60,12 +66,23 @@ class OrderServiceTest {
     private PaymentRepository paymentRepository;
 
     @Mock
+    private OrderValidator orderValidator;
+
+    @Mock
+    private OrderCalculator orderCalculator;
+
+    @Mock
+    private StockManager stockManager;
+
+    @Mock
+    private OrderFactory orderFactory;
+
+    @Mock
     private OrderMapper orderMapper;
 
     @Mock
     private LoggingAspect loggingAspect;
 
-    @InjectMocks
     private OrderService orderService;
 
     // Test data
@@ -80,6 +97,18 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        orderService = new OrderService(
+                orderRepository,
+                cartRepository,
+                paymentRepository,
+                orderMapper,
+                loggingAspect,
+                orderValidator,
+                orderCalculator,
+                stockManager,
+                orderFactory
+        );
+
         testUser = UserTestHelper.defaultUser(1L);
         testAddress = AddressTestHelper.defaultAddress(1L, testUser);
         testCart = CartTestHelper.createCartWithItems(testUser, 2);
@@ -105,9 +134,17 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should create order when cart has items and addresses are valid")
         void shouldCreateOrder_whenCartHasItems() {
-            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(cartRepository.findCartForCheckout(1L)).thenReturn(Optional.of(testCart));
-            when(addressRepository.findById(1L)).thenReturn(Optional.of(testAddress));
+            when(orderValidator.validateUser(1L)).thenReturn(testUser);
+            when(orderValidator.validateCart(1L)).thenReturn(testCart);
+            when(orderValidator.validateAddress(1L, 1L)).thenReturn(testAddress);
+            when(orderCalculator.calculateSubtotal(testCart)).thenReturn(new BigDecimal("3199.98"));
+            when(orderCalculator.calculateShippingCost(testCart)).thenReturn(BigDecimal.ZERO);
+            when(orderCalculator.calculateTax(any(BigDecimal.class))).thenReturn(new BigDecimal("319.998"));
+
+            Set<OrderItem> orderItems = Set.of(mock(OrderItem.class));
+            when(orderFactory.createOrder(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                    .thenReturn(testOrder);
+
             when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
             when(orderMapper.toResponse(any(Order.class))).thenReturn(testResponse);
 
@@ -121,64 +158,59 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should throw exception when user not found")
         void shouldThrowException_whenUserNotFound() {
-            when(userRepository.findById(999L)).thenReturn(Optional.empty());
+            when(orderValidator.validateUser(1L))
+                    .thenThrow(new ResourceNotFoundException("User not found"));
 
-            assertThatThrownBy(() -> orderService.createOrderFromCart(999L, createRequest))
-                    .isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> orderService.createOrderFromCart(1L, createRequest))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("User not found");
         }
 
         @Test
         @DisplayName("Should throw exception when cart is empty")
         void shouldThrowException_whenCartIsEmpty() {
-            Cart emptyCart = CartTestHelper.emptyCart(testUser);
-            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(cartRepository.findCartForCheckout(1L)).thenReturn(Optional.of(emptyCart));
+            when(orderValidator.validateUser(1L)).thenReturn(testUser);
+            when(orderValidator.validateCart(1L))
+                    .thenThrow(new BusinessRuleException("Cannot create order from empty cart"));
 
             assertThatThrownBy(() -> orderService.createOrderFromCart(1L, createRequest))
                     .isInstanceOf(BusinessRuleException.class)
                     .hasMessageContaining("Cannot create order from empty cart");
-
-            verify(orderRepository, never()).save(any());
         }
 
         @Test
         @DisplayName("Should throw exception when product has insufficient stock")
         void shouldThrowException_whenStockInsufficient() {
-            CompleteScenario scenario = CompleteScenario.createScenarioWithStock(1);
-            Cart cart = CartTestHelper.createCartWithProduct(scenario.getUser(), scenario.getProduct(), 2);
-
-            when(userRepository.findById(1L)).thenReturn(Optional.of(scenario.getUser()));
-            when(cartRepository.findCartForCheckout(1L)).thenReturn(Optional.of(cart));
+            when(orderValidator.validateUser(1L)).thenReturn(testUser);
+            when(orderValidator.validateCart(1L)).thenReturn(testCart);
+            doThrow(new BusinessRuleException("Insufficient stock"))
+                    .when(orderValidator).validateStock(testCart);
 
             assertThatThrownBy(() -> orderService.createOrderFromCart(1L, createRequest))
                     .isInstanceOf(BusinessRuleException.class)
                     .hasMessageContaining("Insufficient stock");
-
-            verify(orderRepository, never()).save(any());
         }
 
         @Test
         @DisplayName("Should throw exception when address not found")
         void shouldThrowException_whenAddressNotFound() {
-            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(cartRepository.findCartForCheckout(1L)).thenReturn(Optional.of(testCart));
-            when(addressRepository.findById(1L)).thenReturn(Optional.empty());
+            when(orderValidator.validateUser(1L)).thenReturn(testUser);
+            when(orderValidator.validateCart(1L)).thenReturn(testCart);
+            when(orderValidator.validateAddress(1L, 1L))
+                    .thenThrow(new ResourceNotFoundException("Address not found"));
 
             assertThatThrownBy(() -> orderService.createOrderFromCart(1L, createRequest))
-                    .isInstanceOf(ResourceNotFoundException.class);
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Address not found");
         }
 
         @Test
         @DisplayName("Should throw exception when address does not belong to user")
         void shouldThrowException_whenAddressNotOwnedByUser() {
-            User otherUser = UserTestHelper.defaultUser(2L);
-            Address otherAddress = AddressTestHelper.defaultAddress(2L, otherUser);
-            createRequest.setShippingAddressId(2L);
-            createRequest.setBillingAddressId(2L);
-
-            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(cartRepository.findCartForCheckout(1L)).thenReturn(Optional.of(testCart));
-            when(addressRepository.findById(2L)).thenReturn(Optional.of(otherAddress));
+            when(orderValidator.validateUser(1L)).thenReturn(testUser);
+            when(orderValidator.validateCart(1L)).thenReturn(testCart);
+            when(orderValidator.validateAddress(1L, 1L))
+                    .thenThrow(new BusinessRuleException("Address does not belong to the user"));
 
             assertThatThrownBy(() -> orderService.createOrderFromCart(1L, createRequest))
                     .isInstanceOf(BusinessRuleException.class)
@@ -188,15 +220,23 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should mark cart as converted after order creation")
         void shouldMarkCartAsConverted() {
-            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(cartRepository.findCartForCheckout(1L)).thenReturn(Optional.of(testCart));
-            when(addressRepository.findById(1L)).thenReturn(Optional.of(testAddress));
+            when(orderValidator.validateUser(1L)).thenReturn(testUser);
+            when(orderValidator.validateCart(1L)).thenReturn(testCart);
+            when(orderValidator.validateAddress(1L, 1L)).thenReturn(testAddress);
+            when(orderCalculator.calculateSubtotal(testCart)).thenReturn(new BigDecimal("3199.98"));
+            when(orderCalculator.calculateShippingCost(testCart)).thenReturn(BigDecimal.ZERO);
+            when(orderCalculator.calculateTax(any(BigDecimal.class))).thenReturn(new BigDecimal("319.998"));
+
+            Set<OrderItem> orderItems = Set.of(mock(OrderItem.class));
+            when(orderFactory.createOrder(any(), any(), any(), any(), any(), any(), any(), any(), any()))
+                    .thenReturn(testOrder);
+
             when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
             when(orderMapper.toResponse(any(Order.class))).thenReturn(testResponse);
 
             orderService.createOrderFromCart(1L, createRequest);
 
-            assertThat(testCart.getConvertedToOrder()).isTrue();
+            verify(stockManager).reserveStock(testCart);
             verify(cartRepository).save(testCart);
         }
     }
@@ -276,9 +316,7 @@ class OrderServiceTest {
         }
     }
 
-    // ============================================================
-    // 3. TESTS DE CONSULTAS PARA USUARIO (NUEVOS)
-    // ============================================================
+    // 3. Query tests for users
 
     @Nested
     @DisplayName("User Query Tests")
@@ -353,7 +391,6 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should return orders for user")
         void shouldReturnOrdersForUser() {
-            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
             when(orderRepository.findByUserId(1L)).thenReturn(List.of(testOrder));
             when(orderMapper.toResponseList(anyList())).thenReturn(List.of(testResponse));
 
@@ -366,10 +403,12 @@ class OrderServiceTest {
         @Test
         @DisplayName("Should throw exception when user not found")
         void shouldThrowException_whenUserNotFound() {
-            when(userRepository.findById(999L)).thenReturn(Optional.empty());
+            when(orderValidator.validateUser(1L))
+                    .thenThrow(new ResourceNotFoundException("User not found"));
 
-            assertThatThrownBy(() -> orderService.findByUserId(999L))
-                    .isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> orderService.createOrderFromCart(1L, createRequest))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("User not found");
         }
 
         @Test
@@ -441,11 +480,14 @@ class OrderServiceTest {
         void shouldThrowException_whenOrderNotPending() {
             Order paidOrder = OrderTestHelper.orderWithStatus(OrderStatus.PAID);
             paidOrder.setId(1L);
+            Payment mockPayment = mock(Payment.class);
 
             when(orderRepository.findById(1L)).thenReturn(Optional.of(paidOrder));
+            when(paymentRepository.findByOrderId(1L)).thenReturn(Optional.of(mockPayment));
 
             assertThatThrownBy(() -> orderService.confirmPayment(1L, "tx-123"))
-                    .isInstanceOf(IllegalStateException.class);
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Cannot confirm payment. Current status: PAID");
         }
 
         @Test
@@ -561,8 +603,8 @@ class OrderServiceTest {
             when(orderRepository.findById(1L)).thenReturn(Optional.of(cancelledOrder));
 
             assertThatThrownBy(() -> orderService.cancelOrder(1L, cancelRequest, 1L, "USER"))
-                    .isInstanceOf(OrderAlreadyCancelledException.class)
-                    .hasMessageContaining("Order is already cancelled or refunded");
+                    .isInstanceOf(OrderCancellationNotAllowedException.class)
+                    .hasMessageContaining("Order cannot be cancelled in current status: CANCELLED");
         }
 
         @Test

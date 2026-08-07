@@ -57,7 +57,12 @@ public class OrderService {
     public OrderService(OrderRepository orderRepository,
                         CartRepository cartRepository,
                         PaymentRepository paymentRepository,
-                        OrderMapper orderMapper, LoggingAspect loggingAspect, OrderValidator orderValidator, OrderCalculator orderCalculator, StockManager stockManager, OrderFactory orderFactory) {
+                        OrderMapper orderMapper,
+                        LoggingAspect loggingAspect,
+                        OrderValidator orderValidator,
+                        OrderCalculator orderCalculator,
+                        StockManager stockManager,
+                        OrderFactory orderFactory) {
         this.orderRepository = orderRepository;
         this.orderCalculator = orderCalculator;
         this.stockManager = stockManager;
