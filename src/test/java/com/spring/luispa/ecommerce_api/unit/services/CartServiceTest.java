@@ -12,8 +12,8 @@ import com.spring.luispa.ecommerce_api.domain.user.UserRepository;
 import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.mappers.CartMapper;
 import com.spring.luispa.ecommerce_api.services.CartService;
+import com.spring.luispa.ecommerce_api.services.validation.CartValidator;
 import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
-import com.spring.luispa.ecommerce_api.shared.exception.InsufficientStockException;
 import com.spring.luispa.ecommerce_api.shared.exception.ProductNotActiveException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import com.spring.luispa.ecommerce_api.test.helpers.CartTestHelper;
@@ -24,7 +24,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -33,8 +32,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Cart Service Tests")
@@ -55,9 +53,11 @@ public class CartServiceTest {
     private CartMapper cartMapper;
 
     @Mock
+    private CartValidator cartValidator;
+
+    @Mock
     private LoggingAspect loggingAspect;
 
-    @InjectMocks
     private CartService cartService;
 
     // Test data
@@ -71,7 +71,11 @@ public class CartServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Initialize CartService
+        cartService = new CartService(
+                cartRepository,
+                cartMapper,
+                cartValidator,
+                loggingAspect);
 
         testUser = UserTestHelper.defaultUser(1L);
         testProduct = ProductTestHelper.defaultProduct(1L);
@@ -99,7 +103,9 @@ public class CartServiceTest {
         @Test
         @DisplayName("Should add product to cart when product exists and has stock")
         void shouldAddProductToCart_whenProductExists() {
-            when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            when(cartValidator.validateUser(1L)).thenReturn(testUser);
+            when(cartValidator.validateProduct(1L)).thenReturn(testProduct);
+
             when(cartRepository.findActiveCartWithItems(1L)).thenReturn(Optional.of(testCart));
             when(cartRepository.save(any(Cart.class))).thenReturn(testCart);
             when(cartMapper.toResponse(any(Cart.class))).thenReturn(testResponse);
@@ -114,22 +120,24 @@ public class CartServiceTest {
         @Test
         @DisplayName("Should create new cart if user has no active cart")
         void shouldCreateNewCart_whenNoActiveCart() {
-            when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            when(cartValidator.validateUser(any(Long.class))).thenReturn(testUser);
+            when(cartValidator.validateProduct(any(Long.class))).thenReturn(testProduct);
+
             when(cartRepository.findActiveCartWithItems(1L)).thenReturn(Optional.empty());
-            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
             when(cartRepository.save(any(Cart.class))).thenReturn(testCart);
             when(cartMapper.toResponse(any(Cart.class))).thenReturn(testResponse);
 
             CartResponse result = cartService.addToCart(1L, addRequest);
 
             assertThat(result).isNotNull();
-            verify(cartRepository).save(any(Cart.class));
+            verify(cartRepository, times(2)).save(any(Cart.class));
         }
 
         @Test
         @DisplayName("Should throw exception when product not found")
         void shouldThrowException_whenProductNotFound() {
-            when(productRepository.findById(1L)).thenReturn(Optional.empty());
+            when(cartValidator.validateProduct(1L))
+                    .thenThrow(new ResourceNotFoundException("Product not found"));
 
             assertThatThrownBy(() -> cartService.addToCart(1L, addRequest))
                     .isInstanceOf(ResourceNotFoundException.class);
@@ -139,7 +147,8 @@ public class CartServiceTest {
         @DisplayName("Should throw exception when product is not active")
         void shouldThrowException_whenProductNotActive() {
             testProduct.setActive(false);
-            when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            when(cartValidator.validateProduct(1L))
+                    .thenThrow(new ProductNotActiveException(testProduct.getId(), testProduct.getSku()));
 
             assertThatThrownBy(() -> cartService.addToCart(1L, addRequest))
                     .isInstanceOf(ProductNotActiveException.class);
@@ -149,17 +158,22 @@ public class CartServiceTest {
         @DisplayName("Should throw exception when quantity exceeds stock")
         void shouldThrowException_whenQuantityExceedsStock() {
             addRequest.setQuantity(15);
-            when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            when(cartValidator.validateProduct(1L)).thenReturn(testProduct);
+            doThrow(new BusinessRuleException("Insufficient stock"))
+                    .when(cartValidator)
+                    .validateStock(testProduct, 15);
 
             assertThatThrownBy(() -> cartService.addToCart(1L, addRequest))
-                    .isInstanceOf(InsufficientStockException.class)
+                    .isInstanceOf(BusinessRuleException.class)
                     .hasMessageContaining("Insufficient stock");
         }
 
         @Test
         @DisplayName("Should increment quantity when product already in cart")
         void shouldIncrementQuantity_whenProductAlreadyInCart() {
-            when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            when(cartValidator.validateUser(1L)).thenReturn(testUser);
+            when(cartValidator.validateProduct(1L)).thenReturn(testProduct);
+
             when(cartRepository.findActiveCartWithItems(1L)).thenReturn(Optional.of(testCart));
             when(cartRepository.save(any(Cart.class))).thenReturn(testCart);
             when(cartMapper.toResponse(any(Cart.class))).thenReturn(testResponse);
@@ -179,7 +193,8 @@ public class CartServiceTest {
         @Test
         @DisplayName("Should update item quantity when product exists")
         void shouldUpdateItemQuantity_whenProductExists() {
-            when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            when(cartValidator.validateProduct(1L)).thenReturn(testProduct);
+
             when(cartRepository.findActiveCartWithItems(1L)).thenReturn(Optional.of(testCart));
             when(cartMapper.toResponse(any(Cart.class))).thenReturn(testResponse);
 
@@ -192,7 +207,8 @@ public class CartServiceTest {
         @Test
         @DisplayName("Should throw exception when product not found")
         void shouldThrowException_whenProductNotFound() {
-            when(productRepository.findById(1L)).thenReturn(Optional.empty());
+            when(cartValidator.validateProduct(1L))
+                    .thenThrow(new ResourceNotFoundException("Product not found"));
 
             assertThatThrownBy(() -> cartService.updateCartItem(1L, updateRequest))
                     .isInstanceOf(ResourceNotFoundException.class);
@@ -201,8 +217,8 @@ public class CartServiceTest {
         @Test
         @DisplayName("Should throw exception when product not active")
         void shouldThrowException_whenProductNotActive() {
-            testProduct.setActive(false);
-            when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            when(cartValidator.validateProduct(1L))
+                    .thenThrow(new ProductNotActiveException(testProduct.getId(), testProduct.getSku()));
 
             assertThatThrownBy(() -> cartService.updateCartItem(1L, updateRequest))
                     .isInstanceOf(ProductNotActiveException.class);
@@ -211,7 +227,7 @@ public class CartServiceTest {
         @Test
         @DisplayName("Should throw exception when no active cart found")
         void shouldThrowException_whenNoActiveCart() {
-            when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            when(cartValidator.validateProduct(1L)).thenReturn(testProduct);
             when(cartRepository.findActiveCartWithItems(1L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> cartService.updateCartItem(1L, updateRequest))
@@ -229,7 +245,7 @@ public class CartServiceTest {
         @Test
         @DisplayName("Should remove product from cart")
         void shouldRemoveProductFromCart() {
-            when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            when(cartValidator.validateProduct(1L)).thenReturn(testProduct);
             when(cartRepository.findActiveCartWithItems(1L)).thenReturn(Optional.of(testCart));
             when(cartMapper.toResponse(any(Cart.class))).thenReturn(testResponse);
 
@@ -242,7 +258,8 @@ public class CartServiceTest {
         @Test
         @DisplayName("Should throw exception when product not found")
         void shouldThrowException_whenProductNotFound() {
-            when(productRepository.findById(999L)).thenReturn(Optional.empty());
+            when(cartValidator.validateProduct(999L))
+                    .thenThrow(new ResourceNotFoundException("Product not found"));
 
             assertThatThrownBy(() -> cartService.removeFromCart(1L, 999L))
                     .isInstanceOf(ResourceNotFoundException.class);
@@ -251,7 +268,7 @@ public class CartServiceTest {
         @Test
         @DisplayName("Should throw exception when no active cart found")
         void shouldThrowException_whenNoActiveCart() {
-            when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            when(cartValidator.validateProduct(1L)).thenReturn(testProduct);
             when(cartRepository.findActiveCartWithItems(1L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> cartService.removeFromCart(1L, 1L))
@@ -281,10 +298,9 @@ public class CartServiceTest {
         @Test
         @DisplayName("Should create new cart when no active cart exists")
         void shouldCreateNewCart_whenNoActiveCart() {
+            when(cartValidator.validateUser(1L)).thenReturn(testUser);
             when(cartRepository.findActiveCartByUserId(1L)).thenReturn(Optional.empty());
-            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
             when(cartRepository.save(any(Cart.class))).thenReturn(testCart);
-
             when(cartMapper.toResponse(any(Cart.class))).thenReturn(testResponse);
 
             CartResponse result = cartService.getActiveCart(1L);

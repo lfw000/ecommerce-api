@@ -11,9 +11,8 @@ import com.spring.luispa.ecommerce_api.domain.user.User;
 import com.spring.luispa.ecommerce_api.domain.user.UserRepository;
 import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.mappers.CartMapper;
+import com.spring.luispa.ecommerce_api.services.validation.CartValidator;
 import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
-import com.spring.luispa.ecommerce_api.shared.exception.InsufficientStockException;
-import com.spring.luispa.ecommerce_api.shared.exception.ProductNotActiveException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,28 +26,25 @@ public class CartService {
     private static final Logger log = LoggerFactory.getLogger(CartService.class);
 
     private final CartRepository cartRepository;
-    private final UserRepository userRepository;
-    private final ProductRepository productRepository;
     private final CartMapper cartMapper;
+    private final CartValidator cartValidator;
     private final LoggingAspect loggingAspect;
 
+
     public CartService(CartRepository cartRepository,
-                       UserRepository userRepository,
-                       ProductRepository productRepository,
                        CartMapper cartMapper,
+                       CartValidator cartValidator,
                        LoggingAspect loggingAspect) {
         this.cartRepository = cartRepository;
-        this.userRepository = userRepository;
-        this.productRepository = productRepository;
         this.cartMapper = cartMapper;
+        this.cartValidator = cartValidator;
         this.loggingAspect = loggingAspect;
     }
 
     private Cart getOrCreateActiveCart(Long userId) {
         return cartRepository.findActiveCartByUserId(userId)
                 .orElseGet(() -> {
-                    User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+                    User user = cartValidator.validateUser(userId);
 
                     Cart newCart = new Cart(user);
 
@@ -59,10 +55,9 @@ public class CartService {
     private Cart getOrCreateActiveCartWithItems(Long userId) {
         return cartRepository.findActiveCartWithItems(userId)
                 .orElseGet(() -> {
-                    User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-
-                    return new Cart(user);
+                    User user = cartValidator.validateUser(userId);
+                    Cart newCart = new Cart(user);
+                    return cartRepository.save(newCart);
                 });
     }
 
@@ -83,32 +78,34 @@ public class CartService {
         return cartMapper.toResponse(cart);
     }
 
+    public int getTotalItems(Long userId) {
+        Cart cart = cartRepository.findActiveCartByUserId(userId).orElse(null);
+
+        return cart !=  null ? cart.getTotalItems() : 0;
+    }
+
+    public java.math.BigDecimal getTotalAmount(Long userId) {
+        Cart cart = cartRepository.findActiveCartByUserId(userId).orElse(null);
+
+        return cart != null ? cart.getTotalAmount() : java.math.BigDecimal.ZERO;
+    }
+
+    public boolean hasItems(Long userId) {
+        Cart cart = cartRepository.findActiveCartByUserId(userId).orElse(null);
+
+        return cart != null && cart.getTotalItems() > 0;
+    }
+
     @Transactional
     public CartResponse addToCart(Long userId, AddToCartRequest request) {
         log.info("Adding to cart: userId={}, productId={}, quantity={}",
                 userId, request.getProductId(), request.getQuantity());
         loggingAspect.setUserIdInMDC(userId);
 
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> {
-                    log.warn("Product not found for cart: productId={}", request.getProductId());
-                    return new ResourceNotFoundException("Product not found with id: " + request.getProductId());
-                });
-
-        if (!product.getActive()) {
-            log.warn("Product not active: productId={}, sku={}", product.getId(), product.getSku());
-            throw new ProductNotActiveException(product.getId(), product.getSku());
-        }
-
-        if (request.getQuantity() > product.getStock()) {
-            log.warn("Insufficient stock: productId={}, sku={}, requested={}, available={}",
-                    product.getId(), product.getSku(), request.getQuantity(), product.getStock());
-            throw new InsufficientStockException(
-                    product.getId(),
-                    product.getSku(),
-                    request.getQuantity(),
-                    product.getStock());
-        }
+        cartValidator.validateQuantity(request.getQuantity());
+        User user = cartValidator.validateUser(userId);
+        Product product = cartValidator.validateProduct(request.getProductId());
+        cartValidator.validateStock(product, request.getQuantity());
 
         Cart cart = getOrCreateActiveCartWithItems(userId);
         cart.addItem(product, request.getQuantity());
@@ -127,26 +124,9 @@ public class CartService {
                 userId, request.getProductId(), request.getQuantity());
         loggingAspect.setUserIdInMDC(userId);
 
-        Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> {
-                    log.warn("Product not found for cart update: productId={}",  request.getProductId());
-                    return new ResourceNotFoundException("Product not found with id: " + request.getProductId());
-                });
-
-        if (!product.getActive()) {
-            log.warn("Product not active: productId={}, sku={}", product.getId(), product.getSku());
-            throw new ProductNotActiveException(product.getId(), product.getSku());
-        }
-
-        if (request.getQuantity() > product.getStock()) {
-            log.warn("Insufficient stock: productId={}, sku={}, requested={}, avaiable={}",
-                    product.getId(), product.getSku(), request.getQuantity(), product.getStock());
-            throw new InsufficientStockException(
-                    product.getId(),
-                    product.getSku(),
-                    product.getStock(),
-                    request.getQuantity());
-        }
+        cartValidator.validateQuantity(request.getQuantity());
+        Product product = cartValidator.validateProduct(request.getProductId());
+        cartValidator.validateStock(product, request.getQuantity());
 
         Cart cart = cartRepository.findActiveCartWithItems(userId)
                 .orElseThrow(() -> {
@@ -167,11 +147,7 @@ public class CartService {
         log.info("Removing from cart: userId={}, productId={}", userId, productId);
         loggingAspect.setUserIdInMDC(userId);
 
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> {
-                    log.warn("Product not found for cart removal: productId={}", productId);
-                    return new ResourceNotFoundException("Product not found with id: " + productId);
-                });
+        Product product = cartValidator.validateProduct(productId);
 
         Cart cart = cartRepository.findActiveCartWithItems(userId)
                         .orElseThrow(() -> new ResourceNotFoundException("No active cart found for user"));
@@ -201,21 +177,4 @@ public class CartService {
         log.info("Cart cleared: userId={}, itemsRemoved={}", userId, itemsCleared);
     }
 
-    public boolean hasItems(Long userId) {
-        Cart cart = cartRepository.findActiveCartByUserId(userId).orElse(null);
-
-        return cart != null && cart.getTotalItems() > 0;
-    }
-
-    public int getTotalItems(Long userId) {
-        Cart cart = cartRepository.findActiveCartByUserId(userId).orElse(null);
-
-        return cart !=  null ? cart.getTotalItems() : 0;
-    }
-
-    public java.math.BigDecimal getTotalAmount(Long userId) {
-        Cart cart = cartRepository.findActiveCartByUserId(userId).orElse(null);
-
-        return cart != null ? cart.getTotalAmount() : java.math.BigDecimal.ZERO;
-    }
 }
