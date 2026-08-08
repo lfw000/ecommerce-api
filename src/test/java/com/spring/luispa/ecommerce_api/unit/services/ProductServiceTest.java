@@ -4,12 +4,12 @@ import com.spring.luispa.ecommerce_api.api.dto.request.CreateProductRequest;
 import com.spring.luispa.ecommerce_api.api.dto.request.UpdateProductRequest;
 import com.spring.luispa.ecommerce_api.api.dto.response.ProductResponse;
 import com.spring.luispa.ecommerce_api.domain.product.Category;
-import com.spring.luispa.ecommerce_api.domain.product.CategoryRepository;
 import com.spring.luispa.ecommerce_api.domain.product.Product;
 import com.spring.luispa.ecommerce_api.domain.product.ProductRepository;
 import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.mappers.ProductMapper;
 import com.spring.luispa.ecommerce_api.services.ProductService;
+import com.spring.luispa.ecommerce_api.services.validation.ProductValidator;
 import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
 import com.spring.luispa.ecommerce_api.shared.exception.DuplicateResourceException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
@@ -45,10 +45,10 @@ class ProductServiceTest {
     private ProductRepository productRepository;
 
     @Mock
-    private CategoryRepository categoryRepository;
+    private ProductMapper productMapper;
 
     @Mock
-    private ProductMapper productMapper;
+    private ProductValidator productValidator;
 
     @Mock
     private LoggingAspect loggingAspect;
@@ -67,8 +67,8 @@ class ProductServiceTest {
     void setUp() {
         productService = new ProductService(
                 productRepository,
-                categoryRepository,
                 productMapper,
+                productValidator,
                 loggingAspect
         );
 
@@ -106,8 +106,12 @@ class ProductServiceTest {
         @Test
         @DisplayName("Should create product when valid data provided")
         void shouldCreateProduct_whenValidDataProvided() {
-            when(productRepository.existsBySku(createRequest.getSku())).thenReturn(false);
-            when(categoryRepository.findById(1L)).thenReturn(Optional.of(testCategory));
+            doNothing().when(productValidator).validateSku(createRequest.getSku());
+            doNothing().when(productValidator).validateSkuUniqueness(createRequest.getSku());
+            doNothing().when(productValidator).validatePrice(createRequest.getPrice());
+            doNothing().when(productValidator).validateStock(createRequest.getStock());
+            when(productValidator.validateCategory(1L)).thenReturn(testCategory);
+
             when(productMapper.toEntity(createRequest)).thenReturn(testProduct);
             when(productRepository.save(any(Product.class))).thenReturn(testProduct);
             when(productMapper.toResponse(any(Product.class))).thenReturn(testResponse);
@@ -123,7 +127,8 @@ class ProductServiceTest {
         @Test
         @DisplayName("Should throw exception when SKU already exists")
         void shouldThrowException_whenSkuAlreadyExists() {
-            when(productRepository.existsBySku(createRequest.getSku())).thenReturn(true);
+            doThrow(new DuplicateResourceException("Product already exists with SKU: LAP-001"))
+                    .when(productValidator).validateSkuUniqueness(createRequest.getSku());
 
             assertThatThrownBy(() -> productService.createProduct(createRequest))
                     .isInstanceOf(DuplicateResourceException.class)
@@ -134,10 +139,9 @@ class ProductServiceTest {
         @Test
         @DisplayName("Should throw exception when category not found")
         void shouldThrowException_whenCategoryNotFound() {
-            when(productRepository.existsBySku(createRequest.getSku())).thenReturn(false);
-            when(categoryRepository.findById(999L)).thenReturn(Optional.empty());
-
             createRequest.setCategoryId(999L);
+            when(productValidator.validateCategory(999L))
+                    .thenThrow(new ResourceNotFoundException("Category not found with id: 999"));
 
             assertThatThrownBy(() -> productService.createProduct(createRequest))
                     .isInstanceOf(ResourceNotFoundException.class)
@@ -146,7 +150,7 @@ class ProductServiceTest {
         }
     }
 
-    // Updating tests
+    // Update tests
 
     @Nested
     @DisplayName("Update Product Tests")
@@ -156,6 +160,8 @@ class ProductServiceTest {
         @DisplayName("Should update product when valid data provided")
         void shouldUpdateProduct_whenValidDataProvided() {
             when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            doNothing().when(productValidator).validatePrice(updateRequest.getPrice());
+            doNothing().when(productValidator).validateStock(updateRequest.getStock());
             when(productMapper.toResponse(any(Product.class))).thenReturn(testResponse);
 
             ProductResponse result = productService.updateProduct(1L, updateRequest);
@@ -181,6 +187,7 @@ class ProductServiceTest {
         @DisplayName("Should update only provided fields")
         void shouldUpdateOnlyProvidedFields() {
             when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
+            doNothing().when(productValidator).validateStock(updateRequest.getStock());
             when(productMapper.toResponse(any(Product.class))).thenReturn(testResponse);
 
             updateRequest.setName(null);
@@ -188,13 +195,13 @@ class ProductServiceTest {
 
             productService.updateProduct(1L, updateRequest);
 
-            assertThat(testProduct.getName()).isEqualTo("Laptop Gamer");  // ✅ No cambió
-            assertThat(testProduct.getPrice()).isEqualTo(new BigDecimal("1599.99"));  // ✅ No cambió
-            assertThat(testProduct.getStock()).isEqualTo(15);  // ✅ Cambió
+            assertThat(testProduct.getName()).isEqualTo("Laptop Gamer");
+            assertThat(testProduct.getPrice()).isEqualTo(new BigDecimal("1599.99"));
+            assertThat(testProduct.getStock()).isEqualTo(15);
         }
     }
 
-    // Deletion tests
+    // Delete tests
 
     @Nested
     @DisplayName("Delete Product Tests")
@@ -221,7 +228,7 @@ class ProductServiceTest {
         }
     }
 
-    // Stock tests
+    // Stock management tests
 
     @Nested
     @DisplayName("Stock Management Tests")
@@ -230,6 +237,7 @@ class ProductServiceTest {
         @Test
         @DisplayName("Should update stock")
         void shouldUpdateStock() {
+            doNothing().when(productValidator).validateStock(25);
             when(productRepository.findById(1L)).thenReturn(Optional.of(testProduct));
 
             productService.updateStock(1L, 25);
@@ -278,6 +286,17 @@ class ProductServiceTest {
 
             assertThatThrownBy(() -> productService.updateStock(999L, 10))
                     .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("Should throw exception when stock is negative")
+        void shouldThrowException_whenStockIsNegative() {
+            doThrow(new IllegalArgumentException("Stock cannot be negative"))
+                    .when(productValidator).validateStock(-5);
+
+            assertThatThrownBy(() -> productService.updateStock(1L, -5))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Stock cannot be negative");
         }
     }
 
@@ -380,7 +399,7 @@ class ProductServiceTest {
         @DisplayName("Should return featured products")
         void shouldReturnFeaturedProducts() {
             Pageable limit = Pageable.ofSize(10);
-            when(productRepository.findFeaturedWithImages(any(Pageable.class))).thenReturn(List.of(testProduct));
+            when(productRepository.findFeaturedWithImages(limit)).thenReturn(List.of(testProduct));
             when(productMapper.toResponseList(anyList())).thenReturn(List.of(testResponse));
 
             List<ProductResponse> results = productService.findFeatured();

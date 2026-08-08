@@ -6,7 +6,7 @@ import com.spring.luispa.ecommerce_api.api.dto.response.ProductResponse;
 import com.spring.luispa.ecommerce_api.domain.product.*;
 import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.mappers.ProductMapper;
-import com.spring.luispa.ecommerce_api.shared.exception.DuplicateResourceException;
+import com.spring.luispa.ecommerce_api.services.validation.ProductValidator;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import com.spring.luispa.ecommerce_api.shared.security.SecurityUtils;
 import org.slf4j.Logger;
@@ -26,16 +26,17 @@ public class ProductService {
     private static final Logger log = LoggerFactory.getLogger(ProductService.class);
 
     private final ProductRepository productRepository;
-    private final CategoryRepository categoryRepository;
     private final ProductMapper productMapper;
+    private final ProductValidator productValidator;
     private final LoggingAspect loggingAspect;
 
     public ProductService(ProductRepository productRepository,
-                          CategoryRepository categoryRepository,
-                          ProductMapper productMapper, LoggingAspect loggingAspect) {
+                          ProductMapper productMapper,
+                          ProductValidator productValidator,
+                          LoggingAspect loggingAspect) {
         this.productRepository = productRepository;
-        this.categoryRepository = categoryRepository;
         this.productMapper = productMapper;
+        this.productValidator = productValidator;
         this.loggingAspect = loggingAspect;
     }
 
@@ -56,6 +57,7 @@ public class ProductService {
 
     public ProductResponse findBySku(String sku) {
         boolean isAdmin = SecurityUtils.isAdmin();
+
         Product product;
 
         if (isAdmin) {
@@ -73,6 +75,7 @@ public class ProductService {
         boolean isAdmin = SecurityUtils.isAdmin();
 
         Page<Product> products;
+
         if (isAdmin) {
             products = productRepository.findAll(pageable);
         } else {
@@ -97,6 +100,10 @@ public class ProductService {
     }
 
     public List<ProductResponse> findByPriceRange(BigDecimal min, BigDecimal max) {
+        if (min == null || max == null || min.compareTo(max) >= 0) {
+            throw new IllegalArgumentException("Invalid price range");
+        }
+
         boolean isAdmin = SecurityUtils.isAdmin();
 
         List<Product> products;
@@ -156,30 +163,27 @@ public class ProductService {
         return productMapper.toResponseList(products);
     }
 
+    // Admin methods
+
     @Transactional
     public ProductResponse createProduct(CreateProductRequest request) {
         log.info("Creating product: sku={}, name={}, categoryId={}, price={}",
                 request.getSku(), request.getName(), request.getCategoryId(), request.getPrice());
 
-        if (productRepository.existsBySku(request.getSku())) {
-            log.warn("Product already exists with SKU: {}", request.getSku());
-            throw new DuplicateResourceException("Product already exists with SKU: " + request.getSku());
-        }
+        productValidator.validateSku(request.getSku());
+        productValidator.validateSkuUniqueness(request.getSku());
+        productValidator.validatePrice(request.getPrice());
+        productValidator.validateStock(request.getStock());
 
-        Category category = categoryRepository.findById(request.getCategoryId())
-                .orElseThrow(() -> {
-                    log.warn("Category not found for product creation: categoryId={}", request.getCategoryId());
-                    return new ResourceNotFoundException("Category not found with id: " + request.getCategoryId());
-                });
+        Category category = productValidator.validateCategory(request.getCategoryId());
 
         Product product = productMapper.toEntity(request);
         product.setCategory(category);
 
         if (request.getAttributes() != null && !request.getAttributes().isEmpty()) {
-            log.debug("Product attributes: {}", request.getAttributes());
-            ProductAttributes productAttributes = new ProductAttributes();
-            productAttributes.putAll(request.getAttributes());
-            product.setAttributes(productAttributes);
+            ProductAttributes attributes = new ProductAttributes();
+            attributes.putAll(request.getAttributes());
+            product.setAttributes(attributes);
         }
 
         Product savedProduct = productRepository.save(product);
@@ -207,39 +211,39 @@ public class ProductService {
         Boolean oldActive = product.getActive();
         Boolean oldFeatured = product.isFeatured();
 
-        if (request.getName() != null && !request.getName().isBlank()) {
-            product.setName(request.getName());
-        }
-        if (request.getDescription() != null) {
-            product.setDescription(request.getDescription());
-        }
-        if (request.getActive() != null) {
-            product.setActive(request.getActive());
-        }
-        if (request.getFeatured() != null) {
-            product.setFeatured(request.getFeatured());
-        }
-
         if (request.getCategoryId() != null) {
-            Category category = categoryRepository.findById(request.getCategoryId())
-                    .orElseThrow(() -> {
-                        log.warn("Category not found for product update: categoryId={}", request.getCategoryId());
-                        return new ResourceNotFoundException("Category not found");
-                    });
-
+            Category category = productValidator.validateCategory(request.getCategoryId());
             product.setCategory(category);
         }
 
         if (request.getPrice() != null) {
+            productValidator.validatePrice(request.getPrice());
             product.updatePrice(request.getPrice());
         }
 
         if (request.getStock() != null) {
+            productValidator.validateStock(request.getStock());
             if (request.getStock() > product.getStock()) {
                 product.increaseStock(request.getStock() - product.getStock());
             } else if (request.getStock() < product.getStock()) {
                 product.decreaseStock(product.getStock() - request.getStock());
             }
+        }
+
+        if (request.getName() != null && !request.getName().isBlank()) {
+            product.setName(request.getName());
+        }
+
+        if (request.getDescription() != null) {
+            product.setDescription(request.getDescription());
+        }
+
+        if (request.getActive() != null) {
+            product.setActive(request.getActive());
+        }
+
+        if (request.getFeatured() != null) {
+            product.setFeatured(request.getFeatured());
         }
 
         log.info("Product updated: productId={}, name: {}->{}, price: {}->{}, stock: {}->{}, active: {}->{}, " +
@@ -270,6 +274,8 @@ public class ProductService {
     @Transactional
     public void updateStock(Long productId, Integer newStock) {
         log.info("Updating stock: productId={}, newStock={}", productId, newStock);
+
+        productValidator.validateStock(newStock);
 
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> {
@@ -311,6 +317,11 @@ public class ProductService {
     @Transactional
     public void updateLowStockThreshold(Long productId, Integer threshold) {
         log.info("Updating low stock threshold: productId={}, threshold={}", productId, threshold);
+
+        if (threshold == null || threshold == 0) {
+            log.warn("Invalid low stock threshold: productId={}, threshold={}", productId, threshold);
+            throw new IllegalArgumentException("Threshold cannot be negative");
+        }
 
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> {
