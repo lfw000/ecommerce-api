@@ -9,16 +9,18 @@ import com.spring.luispa.ecommerce_api.domain.payment.Payment;
 import com.spring.luispa.ecommerce_api.domain.payment.PaymentRepository;
 import com.spring.luispa.ecommerce_api.domain.payment.RefundTransaction;
 import com.spring.luispa.ecommerce_api.domain.payment.RefundType;
+import com.spring.luispa.ecommerce_api.domain.user.Address;
+import com.spring.luispa.ecommerce_api.domain.user.Role;
 import com.spring.luispa.ecommerce_api.domain.user.User;
 import com.spring.luispa.ecommerce_api.infrastructure.logging.LoggingAspect;
 import com.spring.luispa.ecommerce_api.mappers.PaymentMapper;
 import com.spring.luispa.ecommerce_api.services.PaymentService;
-import com.spring.luispa.ecommerce_api.shared.enums.OrderStatus;
+import com.spring.luispa.ecommerce_api.services.validation.PaymentValidator;
 import com.spring.luispa.ecommerce_api.shared.enums.PaymentMethod;
 import com.spring.luispa.ecommerce_api.shared.enums.PaymentStatus;
 import com.spring.luispa.ecommerce_api.shared.exception.BusinessRuleException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
-import com.spring.luispa.ecommerce_api.shared.exception.UnauthorizedException;
+import com.spring.luispa.ecommerce_api.shared.exception.UnauthorizedAccessException;
 import com.spring.luispa.ecommerce_api.test.helpers.OrderTestHelper;
 import com.spring.luispa.ecommerce_api.test.helpers.UserTestHelper;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,11 +29,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -50,6 +50,9 @@ class PaymentServiceTest {
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private PaymentValidator paymentValidator;
 
     @Mock
     private PaymentMapper paymentMapper;
@@ -72,10 +75,9 @@ class PaymentServiceTest {
     void setUp() {
         paymentService = new PaymentService(
                 paymentRepository,
-                orderRepository,
                 paymentMapper,
-                loggingAspect
-        );
+                paymentValidator,
+                loggingAspect);
 
         testUser = UserTestHelper.defaultUser(1L);
         testOrder = OrderTestHelper.minimalOrder(1L);
@@ -86,9 +88,6 @@ class PaymentServiceTest {
         realPayment.setId(1L);
         realPayment.setStatus(PaymentStatus.COMPLETED);
         testPayment = spy(realPayment);
-
-        testPayment = new Payment.Builder(testOrder, PaymentMethod.CREDIT_CARD, new BigDecimal("150.00"))
-                .build();
 
         testResponse = new PaymentResponse();
         testResponse.setId(1L);
@@ -104,7 +103,7 @@ class PaymentServiceTest {
         refundRequest.setAmount(new BigDecimal("150.00"));
     }
 
-    // Payment processing tests
+    // Process payment tests
 
     @Nested
     @DisplayName("Process Payment Tests")
@@ -113,8 +112,10 @@ class PaymentServiceTest {
         @Test
         @DisplayName("Should process payment when order is pending and user is owner")
         void shouldProcessPayment_whenOrderIsPending() {
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(testOrder));
-            when(paymentRepository.findByOrderId(1L)).thenReturn(Optional.empty());
+            when(paymentValidator.validateOrderForPayment(1L, 1L)).thenReturn(testOrder);
+            doNothing().when(paymentValidator).validateOrderStatus(testOrder);
+            doNothing().when(paymentValidator).validateNoExistingPayment(1L);
+
             when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
             when(paymentMapper.toResponse(any(Payment.class))).thenReturn(testResponse);
 
@@ -128,7 +129,8 @@ class PaymentServiceTest {
         @Test
         @DisplayName("Should throw exception when order not found")
         void shouldThrowException_whenOrderNotFound() {
-            when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+            when(paymentValidator.validateOrderForPayment(999L, 1L))
+                    .thenThrow(new ResourceNotFoundException("Order not found with id: 999"));
 
             assertThatThrownBy(() -> paymentService.processPayment(999L, processRequest, 1L))
                     .isInstanceOf(ResourceNotFoundException.class);
@@ -137,17 +139,19 @@ class PaymentServiceTest {
         @Test
         @DisplayName("Should throw exception when order does not belong to user")
         void shouldThrowException_whenOrderNotOwnedByUser() {
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(testOrder));
+            when(paymentValidator.validateOrderForPayment(1L, 2L))
+                    .thenThrow(new UnauthorizedAccessException("Order does not belong to user"));
 
             assertThatThrownBy(() -> paymentService.processPayment(1L, processRequest, 2L))
-                    .isInstanceOf(UnauthorizedException.class);
+                    .isInstanceOf(UnauthorizedAccessException.class);
         }
 
         @Test
         @DisplayName("Should throw exception when order is not pending")
         void shouldThrowException_whenOrderNotPending() {
-            testOrder.setStatus(OrderStatus.PAID);
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(testOrder));
+            when(paymentValidator.validateOrderForPayment(1L, 1L)).thenReturn(testOrder);
+            doThrow(new BusinessRuleException("Order cannot be paid. Current status: PAID"))
+                    .when(paymentValidator).validateOrderStatus(testOrder);
 
             assertThatThrownBy(() -> paymentService.processPayment(1L, processRequest, 1L))
                     .isInstanceOf(BusinessRuleException.class)
@@ -157,8 +161,10 @@ class PaymentServiceTest {
         @Test
         @DisplayName("Should throw exception when payment already exists")
         void shouldThrowException_whenPaymentAlreadyExists() {
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(testOrder));
-            when(paymentRepository.findByOrderId(1L)).thenReturn(Optional.of(testPayment));
+            when(paymentValidator.validateOrderForPayment(1L, 1L)).thenReturn(testOrder);
+            doNothing().when(paymentValidator).validateOrderStatus(testOrder);
+            doThrow(new BusinessRuleException("Payment already exists for this order"))
+                    .when(paymentValidator).validateNoExistingPayment(1L);
 
             assertThatThrownBy(() -> paymentService.processPayment(1L, processRequest, 1L))
                     .isInstanceOf(BusinessRuleException.class)
@@ -166,7 +172,7 @@ class PaymentServiceTest {
         }
     }
 
-    // Query tests
+    // Queries tests
 
     @Nested
     @DisplayName("Query Tests")
@@ -190,13 +196,13 @@ class PaymentServiceTest {
             when(paymentRepository.findById(1L)).thenReturn(Optional.of(testPayment));
 
             assertThatThrownBy(() -> paymentService.findById(1L, 2L))
-                    .isInstanceOf(UnauthorizedException.class);
+                    .isInstanceOf(UnauthorizedAccessException.class);
         }
 
         @Test
         @DisplayName("Should return payment by order ID when user is owner")
         void shouldReturnPaymentByOrderId_whenUserIsOwner() {
-            when(orderRepository.findById(1L)).thenReturn(Optional.of(testOrder));
+            when(paymentValidator.validateOrderForPayment(1L, 1L)).thenReturn(testOrder);
             when(paymentRepository.findByOrderId(1L)).thenReturn(Optional.of(testPayment));
             when(paymentMapper.toResponse(any(Payment.class))).thenReturn(testResponse);
 
@@ -209,6 +215,7 @@ class PaymentServiceTest {
         @Test
         @DisplayName("Should return payments by user ID")
         void shouldReturnPaymentsByUserId() {
+            when(paymentValidator.validateUser(1L)).thenReturn(testUser);
             when(paymentRepository.findPaymentsByUserId(1L)).thenReturn(List.of(testPayment));
             when(paymentMapper.toResponseList(anyList())).thenReturn(List.of(testResponse));
 
@@ -241,7 +248,7 @@ class PaymentServiceTest {
         }
     }
 
-    // Refund Tests
+    // Refund tests
 
     @Nested
     @DisplayName("Refund Tests")
@@ -250,23 +257,24 @@ class PaymentServiceTest {
         @Test
         @DisplayName("Should refund payment when user is admin")
         void shouldRefundPayment_whenAdmin() {
-            testOrder.setStatus(OrderStatus.PAID);
-            testPayment.setStatus(PaymentStatus.COMPLETED);
+            testPayment.setStatus(PaymentStatus.COMPLETED);  // ← Esto es lo que faltaba
 
-            when(paymentRepository.findById(1L)).thenReturn(Optional.of(testPayment));
+            when(paymentValidator.validatePaymentForRefund(1L, 1L, "ADMIN")).thenReturn(testPayment);
+            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
             when(paymentMapper.toResponse(any(Payment.class))).thenReturn(testResponse);
 
             PaymentResponse result = paymentService.refundPayment(1L, refundRequest, 1L, "ADMIN");
 
             assertThat(result).isNotNull();
             assertThat(testPayment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+            verify(paymentRepository).save(any(Payment.class));
         }
 
         @Test
         @DisplayName("Should allow user to refund their own payment")
         void shouldAllowUserToRefundTheirOwnPayment() {
-            testPayment.setStatus(PaymentStatus.COMPLETED);
-            when(paymentRepository.findById(1L)).thenReturn(Optional.of(testPayment));
+            when(paymentValidator.validatePaymentForRefund(1L, 1L, "USER")).thenReturn(testPayment);
+            when(paymentRepository.save(any(Payment.class))).thenReturn(testPayment);
             when(paymentMapper.toResponse(any(Payment.class))).thenReturn(testResponse);
 
             PaymentResponse result = paymentService.refundPayment(1L, refundRequest, 1L, "USER");
@@ -277,19 +285,19 @@ class PaymentServiceTest {
         @Test
         @DisplayName("Should throw exception when user tries to refund another user's payment")
         void shouldThrowException_whenUserRefundsOtherPayment() {
-            testPayment.setStatus(PaymentStatus.COMPLETED);
-            when(paymentRepository.findById(1L)).thenReturn(Optional.of(testPayment));
+            when(paymentValidator.validatePaymentForRefund(1L, 2L, "USER"))
+                    .thenThrow(new UnauthorizedAccessException("Cannot refund this payment"));
 
             assertThatThrownBy(() -> paymentService.refundPayment(1L, refundRequest, 2L, "USER"))
-                    .isInstanceOf(UnauthorizedException.class)
+                    .isInstanceOf(UnauthorizedAccessException.class)
                     .hasMessageContaining("Cannot refund this payment");
         }
 
         @Test
         @DisplayName("Should throw exception when payment is not refundable")
         void shouldThrowException_whenPaymentNotRefundable() {
-            testPayment.setStatus(PaymentStatus.PENDING);
-            when(paymentRepository.findById(1L)).thenReturn(Optional.of(testPayment));
+            when(paymentValidator.validatePaymentForRefund(1L, 1L, "ADMIN"))
+                    .thenThrow(new BusinessRuleException("Payment cannot be refunded. Current status: PENDING"));
 
             assertThatThrownBy(() -> paymentService.refundPayment(1L, refundRequest, 1L, "ADMIN"))
                     .isInstanceOf(BusinessRuleException.class)
@@ -299,9 +307,8 @@ class PaymentServiceTest {
         @Test
         @DisplayName("Should throw exception when order is shipped or delivered")
         void shouldThrowException_whenOrderShippedOrDelivered() {
-            testPayment.setStatus(PaymentStatus.COMPLETED);
-            testOrder.setStatus(OrderStatus.SHIPPED);
-            when(paymentRepository.findById(1L)).thenReturn(Optional.of(testPayment));
+            when(paymentValidator.validatePaymentForRefund(1L, 1L, "ADMIN"))
+                    .thenThrow(new BusinessRuleException("Cannot refund payment for shipped or delivered orders"));
 
             assertThatThrownBy(() -> paymentService.refundPayment(1L, refundRequest, 1L, "ADMIN"))
                     .isInstanceOf(BusinessRuleException.class)
@@ -309,9 +316,7 @@ class PaymentServiceTest {
         }
     }
 
-    // ============================================================
-    // TESTS DE REEMBOLSO PARCIAL
-    // ============================================================
+    // Partial refund tests
 
     @Nested
     @DisplayName("Partial Refund Tests")
@@ -364,9 +369,7 @@ class PaymentServiceTest {
         }
     }
 
-    // ============================================================
-    // TESTS DE FALLO DE PAGO
-    // ============================================================
+    // Fail payment tests
 
     @Nested
     @DisplayName("Fail Payment Tests")
@@ -405,13 +408,11 @@ class PaymentServiceTest {
             when(paymentRepository.findById(1L)).thenReturn(Optional.of(testPayment));
 
             assertThatThrownBy(() -> paymentService.failPayment(1L, "Payment failed", 2L, false))
-                    .isInstanceOf(UnauthorizedException.class);
+                    .isInstanceOf(UnauthorizedAccessException.class);
         }
     }
 
-    // ============================================================
-    // TESTS DE ADMIN
-    // ============================================================
+    // Admin tests
 
     @Nested
     @DisplayName("Admin Tests")
