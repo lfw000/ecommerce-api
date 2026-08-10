@@ -1,0 +1,74 @@
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecommerce-postgres
+    environment:
+      POSTGRES_DB: ecommerce_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ecommerce-network
+
+  # Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ecommerce-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Active profile - change here to use a different profile
+      SPRING_PROFILES_ACTIVE: dev
+
+      # Database
+      DB_URL: jdbc:postgresql://postgres:5432/ecommerce_dev
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+
+      # JWT (for development)
+      JWT_SECRET: dockerSecretKeyForDevEnvironmentWith64CharactersOrMore1234567890ABCDEF
+      JWT_EXPIRATION: 900000
+
+      # Port
+      PORT: 8080
+
+      # JVM options
+      JAVA_OPTS: "-Xmx512m -Xms256m"
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persistent logs
+      - app_logs:/var/log/ecommerce-api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - ecommerce-network
+
+volumes:
+  postgres_data:
+    driver: local
+  app_logs:
+    driver: local
+
+networks:
+  ecommerce-network:
+    driver: bridge
