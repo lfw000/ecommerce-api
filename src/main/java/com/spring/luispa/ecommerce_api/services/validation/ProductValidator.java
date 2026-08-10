@@ -3,6 +3,7 @@ package com.spring.luispa.ecommerce_api.services.validation;
 import com.spring.luispa.ecommerce_api.domain.product.Category;
 import com.spring.luispa.ecommerce_api.domain.product.CategoryRepository;
 import com.spring.luispa.ecommerce_api.domain.product.ProductRepository;
+import com.spring.luispa.ecommerce_api.shared.exception.DuplicateResourceException;
 import com.spring.luispa.ecommerce_api.shared.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +28,7 @@ public class ProductValidator {
 
     public void validateSkuUniqueness(String sku) {
         if (productRepository.existsBySku(sku)) {
-            throw new IllegalArgumentException("Product already exists with SKU: " + sku);
+            throw new DuplicateResourceException("Product already exists with SKU: " + sku);
         }
     }
 

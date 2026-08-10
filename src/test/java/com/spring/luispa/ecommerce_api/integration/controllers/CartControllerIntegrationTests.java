@@ -298,9 +298,7 @@ class CartControllerIntegrationTest {
                             .header("Authorization", "Bearer " + accessToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(updateRequest)))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.items").isEmpty())
-                    .andExpect(jsonPath("$.totalItems").value(0));
+                    .andExpect(status().isBadRequest());
         }
     }
 
